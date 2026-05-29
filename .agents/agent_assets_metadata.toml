@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "afmETUY3m-6fMaicDEanu"
+uri = "file://roblox-ai-project.tar.gz"
+type = "unspecified"
+title = "roblox-ai-project.tar.gz"

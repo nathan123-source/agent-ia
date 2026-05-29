@@ -1,0 +1,1722 @@
+-- Início do Script Corrigido
+local DiscordLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/UI-Libs/main/discord%20lib.txt"))()
+
+local Window = DiscordLib:Window("🧊 ICE MENU | by .eoedukrlh")
+
+-- ABA INICIO
+local InicioTab = Window:Server("Início", "http://www.roblox.com/asset/?id=6031075938")
+local InicioChannel = InicioTab:Channel("Bem-vindo")
+
+InicioChannel:Label("ICE MENU v2.0")
+InicioChannel:Label("Sistema reorganizado e otimizado")
+InicioChannel:Label("Status: ✅ Online")
+InicioChannel:Button("Carregar Tudo", function()
+    DiscordLib:Notification("ICE MENU", "Todas as funções carregadas!", "ok")
+end)
+
+-- ABA COMBATE
+local CombateTab = Window:Server("Combate", "http://www.roblox.com/asset/?id=6031075938")
+
+-- Hitbox
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local headModEnabled = false
+local headSize = 15
+local friendlyList = {}
+local hitboxLoop = nil
+
+local function updateHitbox()
+    if headModEnabled then
+        for _, plr in pairs(Players:GetPlayers()) do
+            if plr ~= LocalPlayer and plr.Character ~= nil and not friendlyList[plr.Name] then
+                for _, part in pairs(plr.Character:GetChildren()) do
+                    if part:IsA("BasePart") and (part.Name:lower():find("head") or part.Name:lower():find("cabeca") or part.Name:lower():find("cabesa")) then
+                        part.Size = Vector3.new(headSize, headSize, headSize)
+                        part.Transparency = 0.7
+                        part.CanCollide = false
+                        part.Massless = true
+                    end
+                end
+            elseif friendlyList[plr.Name] and plr.Character ~= nil then
+                for _, part in pairs(plr.Character:GetChildren()) do
+                    if part:IsA("BasePart") and (part.Name:lower():find("head") or part.Name:lower():find("cabeca") or part.Name:lower():find("cabesa")) then
+                        part.Size = Vector3.new(2, 1, 1)
+                        part.Transparency = 0
+                        part.CanCollide = true
+                        part.Massless = false
+                    end
+                end
+            end
+        end
+    else
+        for _, plr in pairs(Players:GetPlayers()) do
+            if plr ~= LocalPlayer and plr.Character ~= nil then
+                for _, part in pairs(plr.Character:GetChildren()) do
+                    if part:IsA("BasePart") and (part.Name:lower():find("head") or part.Name:lower():find("cabeca") or part.Name:lower():find("cabesa")) then
+                        part.Size = Vector3.new(2, 1, 1)
+                        part.Transparency = 0
+                        part.CanCollide = true
+                        part.Massless = false
+                    end
+                end
+            end
+        end
+    end
+end
+
+local function startHitboxLoop()
+    if hitboxLoop then return end
+    
+    hitboxLoop = game:GetService("RunService").Heartbeat:Connect(function()
+        updateHitbox()
+    end)
+end
+
+local function stopHitboxLoop()
+    if hitboxLoop then
+        hitboxLoop:Disconnect()
+        hitboxLoop = nil
+    end
+end
+
+-- Configuração do Hitbox
+local HitboxChannel = CombateTab:Channel("Hitbox")
+
+HitboxChannel:Toggle("Hitbox Expandida", false, function(state)
+    headModEnabled = state
+    
+    if state then
+        startHitboxLoop()
+        DiscordLib:Notification("Hitbox", "Hitbox ativada!", "ok")
+    else
+        stopHitboxLoop()
+        updateHitbox()
+        DiscordLib:Notification("Hitbox", "Hitbox desativada!", "fail")
+    end
+end)
+
+HitboxChannel:Textbox("Tamanho Hitbox", "Digite o tamanho (5-50)", true, function(value)
+    local num = tonumber(value)
+    if num and num >= 5 and num <= 50 then
+        headSize = num
+        DiscordLib:Notification("Hitbox", "Tamanho definido para: " .. num, "ok")
+    else
+        DiscordLib:Notification("Erro", "Digite um número entre 5 e 50!", "fail")
+    end
+end)
+
+-- Lista de amigos para Hitbox
+local friendOptions = {}
+for _, player in ipairs(Players:GetPlayers()) do
+    if player ~= LocalPlayer then
+        table.insert(friendOptions, player.Name)
+    end
+end
+
+HitboxChannel:Dropdown("Adicionar Amigo (Hitbox)", friendOptions, function(value)
+    if not friendlyList[value] then
+        friendlyList[value] = true
+        DiscordLib:Notification("Hitbox", value .. " adicionado à lista de amigos!", "ok")
+    end
+end)
+
+HitboxChannel:Button("Limpar Lista de Amigos", function()
+    friendlyList = {}
+    DiscordLib:Notification("Hitbox", "Lista de amigos limpa!", "ok")
+end)
+
+-- Detectar novos jogadores para hitbox
+Players.PlayerAdded:Connect(function(player)
+    table.insert(friendOptions, player.Name)
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+    if friendlyList[player.Name] then
+        friendlyList[player.Name] = nil
+    end
+end)
+
+-- Auto TP Safe
+local autoTpSafeAtivado = false
+local RunService = game:GetService("RunService")
+local SafeCFrame = CFrame.new(-1294.1842, 3.68992472, -162.852188, 0.49327907, 0, 0.86987114, 0, 1, 0, -0.86987114, 0, 0.49327907)
+
+local function teleportTo(cframe)
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        LocalPlayer.Character.HumanoidRootPart.CFrame = cframe
+    end
+end
+
+RunService.Heartbeat:Connect(function()
+    if autoTpSafeAtivado and LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+        local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if humanoid and humanoid.Health > 0 then
+            local healthPercent = (humanoid.Health / humanoid.MaxHealth) * 100
+            if healthPercent <= 35 then
+                teleportTo(SafeCFrame)
+                DiscordLib:Notification("Auto TP Safe", "Teleportado para safe (vida baixa)!", "ok")
+            end
+        end
+    end
+end)
+
+HitboxChannel:Toggle("Auto TP Safe", false, function(state)
+    autoTpSafeAtivado = state
+    DiscordLib:Notification("Auto TP Safe", state and "Ativado! Vai teleportar com vida <= 35%" or "Desativado!", state and "ok" or "fail")
+end)
+
+-- AUTO-CL
+local autoCLAtivado = false
+local function ativarAutoCL()
+    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local humanoid = char:WaitForChild("Humanoid")
+    humanoid.Died:Connect(function()
+        if autoCLAtivado then
+            local ok = pcall(function() game:Shutdown() end)
+            if not ok then pcall(function() game:Kick("AUTO CL ATIVADO") end) end
+        end
+    end)
+end
+
+LocalPlayer.CharacterAdded:Connect(ativarAutoCL)
+ativarAutoCL()
+
+HitboxChannel:Toggle("Auto-CL", false, function(state)
+    autoCLAtivado = state
+    DiscordLib:Notification("AUTO-CL", state and "Ativado! Vai fechar ao morrer." or "Desativado!", state and "ok" or "fail")
+end)
+
+-- ABA VISUAL
+local VisualTab = Window:Server("Visual", "http://www.roblox.com/asset/?id=6031075938")
+
+local VisualChannel = VisualTab:Channel("Configurações Visuais")
+
+VisualChannel:Toggle("Highlight Player", false, function(state)
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr.Character then
+            local highlight = plr.Character:FindFirstChildOfClass("Highlight")
+            if state then
+                if not highlight then
+                    local newHighlight = Instance.new("Highlight")
+                    newHighlight.FillTransparency = 1
+                    newHighlight.OutlineColor = Color3.fromRGB(0, 255, 0)
+                    newHighlight.Parent = plr.Character
+                end
+            else
+                if highlight then highlight:Destroy() end
+            end
+        end
+    end
+    DiscordLib:Notification("Highlight", state and "Highlight ativado!" or "Highlight desativado!", state and "ok" or "fail")
+end)
+
+-- ESP Highlight
+local espAtivo = false
+local espStorage = nil
+local espConnections = {}
+
+local function criarESPStorage()
+    if not espStorage then
+        espStorage = Instance.new("Folder")
+        espStorage.Parent = game:GetService("CoreGui")
+        espStorage.Name = "Highlight_Storage"
+    end
+    return espStorage
+end
+
+local function limparESP()
+    if espStorage then
+        espStorage:Destroy()
+        espStorage = nil
+    end
+    
+    for player, connection in pairs(espConnections) do
+        if connection then
+            connection:Disconnect()
+        end
+    end
+    espConnections = {}
+end
+
+local function aplicarHighlight(plr)
+    if not espAtivo or not plr then return end
+    
+    local Highlight = Instance.new("Highlight")
+    Highlight.Name = plr.Name
+    Highlight.FillColor = Color3.fromRGB(175, 25, 255)
+    Highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    Highlight.FillTransparency = 0.5
+    Highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    Highlight.OutlineTransparency = 0
+    Highlight.Parent = criarESPStorage()
+    
+    local plrchar = plr.Character
+    if plrchar then
+        Highlight.Adornee = plrchar
+    end
+
+    espConnections[plr] = plr.CharacterAdded:Connect(function(char)
+        if espAtivo and Highlight then
+            Highlight.Adornee = char
+        end
+    end)
+end
+
+local function iniciarESPHighlight()
+    if espAtivo then return end
+    
+    espAtivo = true
+    limparESP()
+    
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= Players.LocalPlayer then
+            aplicarHighlight(player)
+        end
+    end
+    
+    espConnections.playerAdded = Players.PlayerAdded:Connect(function(player)
+        aplicarHighlight(player)
+    end)
+    
+    espConnections.playerRemoving = Players.PlayerRemoving:Connect(function(plr)
+        if espStorage and espStorage:FindFirstChild(plr.Name) then
+            espStorage[plr.Name]:Destroy()
+        end
+        if espConnections[plr] then
+            espConnections[plr]:Disconnect()
+            espConnections[plr] = nil
+        end
+    end)
+    
+    DiscordLib:Notification("ESP", "ESP Highlight ativado!", "ok")
+end
+
+local function pararESPHighlight()
+    if not espAtivo then return end
+    
+    espAtivo = false
+    limparESP()
+    DiscordLib:Notification("ESP", "ESP Highlight desativado!", "fail")
+end
+
+VisualChannel:Toggle("ESP Highlight", false, function(state)
+    if state then
+        iniciarESPHighlight()
+    else
+        pararESPHighlight()
+    end
+end)
+
+-- Unlocker FPS
+VisualChannel:Button("Unlocker FPS", function()
+    loadstring(game:HttpGet('https://raw.githubusercontent.com/vexroxd/My-Script-/main/roblox%20fps%20unlocker%20script.lua'))()
+    DiscordLib:Notification("Unlocker FPS", "FPS desbloqueado com sucesso!", "ok")
+end)
+
+-- ABA OUTROS
+local OutrosTab = Window:Server("Outros", "http://www.roblox.com/asset/?id=6031075938")
+
+-- Teleporte Channel
+local TeleporteChannel = OutrosTab:Channel("Teleporte")
+
+TeleporteChannel:Label("Locais de Teleporte")
+
+TeleporteChannel:Button("Praça", function()
+    teleportTo(SafeCFrame)
+    DiscordLib:Notification("Teleporte", "Teleportado para a Praça!", "ok")
+end)
+
+TeleporteChannel:Button("Prefeitura", function()
+    teleportTo(CFrame.new(-1292.18823, 6.60852337, 169.766785, 0.984812498, 0, 0.173621148, 0, 1, 0, -0.173621148, 0, 0.984812498))
+    DiscordLib:Notification("Teleporte", "Teleportado para a Prefeitura!", "ok")
+end)
+
+TeleporteChannel:Button("Banco", function()
+    teleportTo(CFrame.new(-1405.34473, 1.23246074, -398.694702, 1, 0, 0, 0, 1, 0, 0, 0, 1))
+    DiscordLib:Notification("Teleporte", "Teleportado para o Banco!", "ok")
+end)
+
+TeleporteChannel:Button("Center Bank", function()
+    teleportTo(CFrame.new(-1157.25977, 2.315413, -1000.95416, 0, 0, -1, 0, 1, 0, 1, 0, 0))
+    DiscordLib:Notification("Teleporte", "Teleportado para o Center Bank!", "ok")
+end)
+
+TeleporteChannel:Button("PRF", function()
+    teleportTo(CFrame.new(-1994.63074, 6.37885952, 1886.17847, -1, 0, 0, 0, 1, 0, 0, 0, -1))
+    DiscordLib:Notification("Teleporte", "Teleportado para a PRF!", "ok")
+end)
+
+TeleporteChannel:Button("Concessionária", function()
+    teleportTo(CFrame.new(-970.959351, 5.29823542, -5.62179804, -1.1920929e-07, 0, -1.00000012, 0, 1, 0, 1.00000012, 0, -1.1920929e-07))
+    DiscordLib:Notification("Teleporte", "Teleportado para a Concessionária!", "ok")
+end)
+
+TeleporteChannel:Button("Loja de Imóveis", function()
+    teleportTo(CFrame.new(-964.41333, 3.87698412, 55.2492104, 1, 0, 0, 0, 1, 0, 0, 0, 1))
+    DiscordLib:Notification("Teleporte", "Teleportado para a Loja de Imóveis!", "ok")
+end)
+
+TeleporteChannel:Button("Ilegal", function()
+    teleportTo(CFrame.new(-1753.98865, 4.02870941, -445.309418, 0.772234976, 0, -0.635337055, 0, 1, 0, 0.635337055, 0, 0.772234976))
+    DiscordLib:Notification("Teleporte", "Teleportado para a Área Ilegal!", "ok")
+end)
+
+TeleporteChannel:Button("Armazém", function()
+    teleportTo(CFrame.new(-2229.50439, 36.6282196, 6098.69678, -1.1920929e-07, -0, -1.00000012, 0, 1, -0, 1.00000012, 0, -1.1920929e-07))
+    DiscordLib:Notification("Teleporte", "Teleportado para o Armazém!", "ok")
+end)
+
+TeleporteChannel:Button("Plantação", function()
+    teleportTo(CFrame.new(-3785.04663, 107.416, -1174.4856, -0.930488288, 3.66690927e-08, 0.366321683, 6.15248164e-09, 1, -8.44729655e-08, -0.366321683, -7.63473196e-08, -0.930488288))
+    DiscordLib:Notification("Teleporte", "Teleportado para a Plantação!", "ok")
+end)
+
+TeleporteChannel:Button("Loja de Equipamentos", function()
+    teleportTo(CFrame.new(-1211.80762, 4.41305256, -395.926727, 0.999999285, 0, 0.00120850792, 0, 1, 0, -0.00120850792, 0, 0.999999285))
+    DiscordLib:Notification("Teleporte", "Teleportado para a Loja de Equipamentos!", "ok")
+end)
+
+TeleporteChannel:Button("Joalheria", function()
+    teleportTo(CFrame.new(-1833.71521, 3.47987986, -380.621094, -1.1920929e-07, -0, -1.00000012, 0, 1, -0, 1.00000012, 0, -1.1920929e-07))
+    DiscordLib:Notification("Teleporte", "Teleportado para a Joalheria!", "ok")
+end)
+
+-- Teleporte/Spectate Jogador
+local SpectateTarget = nil
+local SpectateConnection = nil
+
+local function initSpectateLoop()
+    if SpectateConnection then return end
+
+    local Camera = workspace.CurrentCamera
+
+    SpectateConnection = game:GetService("RunService").RenderStepped:Connect(function()
+        if SpectateTarget and SpectateTarget.Character and SpectateTarget.Character:FindFirstChild("HumanoidRootPart") then
+            local humanoid = SpectateTarget.Character:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                Camera.CameraSubject = humanoid
+            end
+        else
+            if not SpectateTarget and LocalPlayer.Character then
+                local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+                if humanoid then
+                    Camera.CameraSubject = humanoid
+                end
+            end
+        end
+    end)
+end
+
+TeleporteChannel:Button("Abrir Teleport Jogador", function()
+    local RunService = game:GetService("RunService")
+    local Camera = workspace.CurrentCamera
+    
+    if not game:GetService("CoreGui"):FindFirstChild("TeleportSpectateGui") then
+        local ScreenGui = Instance.new("ScreenGui")
+        ScreenGui.Name = "TeleportSpectateGui"
+        ScreenGui.Parent = game:GetService("CoreGui")
+
+        local Frame = Instance.new("Frame")
+        Frame.Size = UDim2.new(0, 250, 0, 150)
+        Frame.Position = UDim2.new(0.5, -125, 0.5, -75)
+        Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+        Frame.BorderSizePixel = 0
+        Frame.Active = true
+        Frame.Draggable = true
+        Frame.Parent = ScreenGui
+
+        local Title = Instance.new("TextLabel")
+        Title.Size = UDim2.new(1, 0, 0, 30)
+        Title.BackgroundTransparency = 1
+        Title.Text = "Teleport / Spectate"
+        Title.TextColor3 = Color3.new(1, 1, 1)
+        Title.Font = Enum.Font.SourceSansBold
+        Title.TextSize = 20
+        Title.Parent = Frame
+
+        local TextBox = Instance.new("TextBox")
+        TextBox.Size = UDim2.new(1, -20, 0, 30)
+        TextBox.Position = UDim2.new(0, 10, 0, 40)
+        TextBox.PlaceholderText = "Digite o nome do jogador"
+        TextBox.Text = ""
+        TextBox.ClearTextOnFocus = false
+        TextBox.TextColor3 = Color3.new(1, 1, 1)
+        TextBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+        TextBox.BorderSizePixel = 0
+        TextBox.Parent = Frame
+
+        local function GetPlayerByName(name)
+            name = name:lower()
+            for _, player in ipairs(Players:GetPlayers()) do
+                if player.Name:lower():sub(1, #name) == name then
+                    return player
+                end
+            end
+            return nil
+        end
+
+        local TeleportButton = Instance.new("TextButton")
+        TeleportButton.Size = UDim2.new(0.45, 0, 0, 30)
+        TeleportButton.Position = UDim2.new(0.05, 0, 0, 80)
+        TeleportButton.Text = "Teleportar"
+        TeleportButton.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+        TeleportButton.TextColor3 = Color3.new(1, 1, 1)
+        TeleportButton.Font = Enum.Font.SourceSansBold
+        TeleportButton.TextSize = 18
+        TeleportButton.Parent = Frame
+
+        local SpectateButton = Instance.new("TextButton")
+        SpectateButton.Size = UDim2.new(0.45, 0, 0, 30)
+        SpectateButton.Position = UDim2.new(0.5, 0, 0, 80)
+        SpectateButton.Text = "Espectar"
+        SpectateButton.BackgroundColor3 = Color3.fromRGB(255, 140, 0)
+        SpectateButton.TextColor3 = Color3.new(1, 1, 1)
+        SpectateButton.Font = Enum.Font.SourceSansBold
+        SpectateButton.TextSize = 18
+        SpectateButton.Parent = Frame
+        
+        local Spectating = false
+        initSpectateLoop()
+
+        TeleportButton.MouseButton1Click:Connect(function()
+            local target = GetPlayerByName(TextBox.Text)
+            if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+                LocalPlayer.Character:MoveTo(target.Character.HumanoidRootPart.Position + Vector3.new(0, 3, 0))
+                DiscordLib:Notification("Teleporte", "Teleportado para " .. target.Name, "ok")
+            else
+                DiscordLib:Notification("Erro", "Jogador não encontrado!", "fail")
+            end
+        end)
+
+        SpectateButton.MouseButton1Click:Connect(function()
+            local target = GetPlayerByName(TextBox.Text)
+            
+            if Spectating then
+                Spectating = false
+                SpectateTarget = nil
+                SpectateButton.Text = "Espectar"
+                DiscordLib:Notification("Spectate", "Parou de espectar", "ok")
+            else
+                if target and target.Character then
+                    Spectating = true
+                    SpectateTarget = target
+                    SpectateButton.Text = "Parar Espectar"
+                    DiscordLib:Notification("Spectate", "Espectando " .. target.Name, "ok")
+                else
+                    DiscordLib:Notification("Erro", "Jogador não encontrado!", "fail")
+                end
+            end
+        end)
+        
+        ScreenGui.Parent = game:GetService("CoreGui")
+        ScreenGui.AncestryChanging:Connect(function(child, newParent)
+            if child == ScreenGui and not newParent then
+                if Spectating then
+                    Spectating = false
+                    SpectateTarget = nil
+                end
+            end
+        end)
+    end
+end)
+
+-- Farm Channel
+local FarmChannel = OutrosTab:Channel("Farm")
+
+FarmChannel:Label("Auto Farms")
+
+-- AUTO FARM GARI
+local AutoFarmGari = false
+local farmGariConnection = nil
+local lastSwitchTimeGari = 0
+local currentTargetIndexGari = 1
+
+local pontosGari = {
+    CFrame.new(-1548.10632, 4.02870989, -405.713684),
+    CFrame.new(-1546.32886, 4.02870941, -382.746277)
+}
+
+local lastProximityCheckGari = 0
+local proximityCheckIntervalGari = 2
+
+local function handleProximityPromptsGari(hrp)
+    local now = tick()
+    if now - lastProximityCheckGari < proximityCheckIntervalGari then return end
+    lastProximityCheckGari = now
+    
+    for _, prompt in ipairs(workspace:GetDescendants()) do
+        if not AutoFarmGari then break end
+        if prompt:IsA("ProximityPrompt") and prompt.Enabled then
+            local part = prompt.Parent
+            if part and part:IsA("BasePart") then
+                local distance = (part.Position - hrp.Position).Magnitude
+                if distance <= 15 then
+                    fireproximityprompt(prompt)
+                    task.wait(0.2)
+                    break
+                end
+            end
+        end
+    end
+end
+
+local function StartAutoFarmGari()
+    local RunService = game:GetService("RunService")
+    
+    if farmGariConnection then
+        farmGariConnection:Disconnect()
+        farmGariConnection = nil
+    end
+    
+    farmGariConnection = RunService.Heartbeat:Connect(function()
+        if not AutoFarmGari then return end
+        
+        local character = LocalPlayer.Character
+        if not character then return end
+        
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        local hrp = character:FindFirstChild("HumanoidRootPart")
+        
+        if not humanoid or humanoid.Health <= 0 or not hrp then return end
+        
+        local now = tick()
+        if now - lastSwitchTimeGari >= 5 then
+            lastSwitchTimeGari = now
+            currentTargetIndexGari = currentTargetIndexGari == 1 and 2 or 1
+            hrp.CFrame = pontosGari[currentTargetIndexGari]
+        end
+        
+        handleProximityPromptsGari(hrp)
+    end)
+end
+
+-- AUTO FARM FAZENDEIRO
+local AutoFarmFazendeiro = false
+local farmFazendeiroConnection = nil
+local lastSwitchTimeFazendeiro = 0
+local currentTargetIndexFazendeiro = 1
+
+local pontosFazendeiro = {
+    CFrame.new(-3370.44263, 35.4769325, 5449.66113, -0.999987185, 5.98853802e-08, 0.00506210001, 5.96151608e-08, 1, -5.35327302e-08, -0.00506210001, -5.32302664e-08, -0.999987185),
+    CFrame.new(-3309.35889, 35.4617081, 5401.24219, -0.983581722, -2.40835671e-08, 0.18046321, -2.60686779e-08, 1, -8.62840555e-09, -0.18046321, -1.31911797e-08, -0.983581722)
+}
+
+local lastProximityCheckFazendeiro = 0
+local proximityCheckIntervalFazendeiro = 2
+
+local function handleProximityPromptsFazendeiro(hrp)
+    local now = tick()
+    if now - lastProximityCheckFazendeiro < proximityCheckIntervalFazendeiro then return end
+    lastProximityCheckFazendeiro = now
+    
+    for _, prompt in ipairs(workspace:GetDescendants()) do
+        if not AutoFarmFazendeiro then break end
+        if prompt:IsA("ProximityPrompt") and prompt.Enabled then
+            local part = prompt.Parent
+            if part and part:IsA("BasePart") then
+                local distance = (part.Position - hrp.Position).Magnitude
+                if distance <= 15 then
+                    fireproximityprompt(prompt)
+                    task.wait(0.2)
+                    break
+                end
+            end
+        end
+    end
+end
+
+local function StartAutoFarmFazendeiro()
+    local RunService = game:GetService("RunService")
+    
+    if farmFazendeiroConnection then
+        farmFazendeiroConnection:Disconnect()
+        farmFazendeiroConnection = nil
+    end
+    
+    farmFazendeiroConnection = RunService.Heartbeat:Connect(function()
+        if not AutoFarmFazendeiro then return end
+        
+        local character = LocalPlayer.Character
+        if not character then return end
+        
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        local hrp = character:FindFirstChild("HumanoidRootPart")
+        
+        if not humanoid or humanoid.Health <= 0 or not hrp then return end
+        
+        local now = tick()
+        if now - lastSwitchTimeFazendeiro >= 5 then
+            lastSwitchTimeFazendeiro = now
+            currentTargetIndexFazendeiro = currentTargetIndexFazendeiro == 1 and 2 or 1
+            hrp.CFrame = pontosFazendeiro[currentTargetIndexFazendeiro]
+        end
+        
+        handleProximityPromptsFazendeiro(hrp)
+    end)
+end
+
+-- Toggles dos Farms
+FarmChannel:Toggle("Auto Farm Gari", false, function(state)
+    AutoFarmGari = state
+    
+    if AutoFarmGari then
+        AutoFarmFazendeiro = false
+        
+        if farmFazendeiroConnection then
+            farmFazendeiroConnection:Disconnect()
+            farmFazendeiroConnection = nil
+        end
+        
+        lastSwitchTimeGari = tick()
+        StartAutoFarmGari()
+        DiscordLib:Notification("Auto Farm Gari", "Farm Gari iniciado!", "ok")
+    else
+        if farmGariConnection then
+            farmGariConnection:Disconnect()
+            farmGariConnection = nil
+        end
+        DiscordLib:Notification("Auto Farm Gari", "Farm Gari parado!", "fail")
+    end
+end)
+
+FarmChannel:Toggle("Auto Farm Fazendeiro", false, function(state)
+    AutoFarmFazendeiro = state
+    
+    if AutoFarmFazendeiro then
+        AutoFarmGari = false
+        
+        if farmGariConnection then
+            farmGariConnection:Disconnect()
+            farmGariConnection = nil
+        end
+        
+        lastSwitchTimeFazendeiro = tick()
+        StartAutoFarmFazendeiro()
+        DiscordLib:Notification("Auto Farm Fazendeiro", "Farm Fazendeiro iniciado!", "ok")
+    else
+        if farmFazendeiroConnection then
+            farmFazendeiroConnection:Disconnect()
+            farmFazendeiroConnection = nil
+        end
+        DiscordLib:Notification("Auto Farm Fazendeiro", "Farm Fazendeiro parado!", "fail")
+    end
+end)
+
+-- Reconexão de farms quando o personagem morre
+LocalPlayer.CharacterAdded:Connect(function(character)
+    if AutoFarmGari then
+        task.wait(2)
+        StartAutoFarmGari()
+    elseif AutoFarmFazendeiro then
+        task.wait(2)
+        StartAutoFarmFazendeiro()
+    end
+end)
+
+-- Noclip
+local noclip = false
+local noclipConnection = nil
+
+local function setCollisions(collide)
+    if LocalPlayer.Character then
+        for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = collide
+            end
+        end
+    end
+end
+
+OutrosTab:Channel("Utilidades"):Toggle("Noclip", false, function(state)
+    noclip = state
+    if noclip then
+        noclipConnection = RunService.RenderStepped:Connect(function()
+            setCollisions(false)
+        end)
+        DiscordLib:Notification("Noclip", "Noclip Ativado!", "ok")
+    else
+        if noclipConnection then
+            noclipConnection:Disconnect()
+            noclipConnection = nil
+        end
+        setCollisions(true)
+        DiscordLib:Notification("Noclip", "Noclip Desativado!", "fail")
+    end
+end)
+
+-- FLY ORPHEUS
+local flySpeed = 15
+local flyGui = nil
+
+OutrosTab:Channel("Movimento"):Button("Ativar Fly Orpheus", function()
+    if flyGui then
+        flyGui:Destroy()
+        flyGui = nil
+    end
+
+    local RunService = game:GetService("RunService")
+    local UIS = game:GetService("UserInputService")
+
+    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local hrp = char:WaitForChild("HumanoidRootPart")
+    local hum = char:WaitForChild("Humanoid")
+
+    local flyOn = false
+    local up = 0
+
+    flyGui = Instance.new("ScreenGui")
+    flyGui.Name = "FlyOrpheusGui"
+    flyGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+    flyGui.ResetOnSpawn = false
+
+    local toggle = Instance.new("TextButton")
+    toggle.Size = UDim2.new(0, 120, 0, 45)
+    toggle.Position = UDim2.new(0, 10, 1, -60)
+    toggle.AnchorPoint = Vector2.new(0, 1)
+    toggle.Text = "🚀 Fly OFF"
+    toggle.Font = Enum.Font.GothamBold
+    toggle.TextSize = 18
+    toggle.BackgroundColor3 = Color3.fromRGB(30,30,30)
+    toggle.TextColor3 = Color3.new(1,1,1)
+    toggle.Parent = flyGui
+
+    local function roundBtn(txt, pos)
+        local b = Instance.new("TextButton")
+        b.Size = UDim2.new(0, 60, 0, 60)
+        b.Position = pos
+        b.AnchorPoint = Vector2.new(1, 1)
+        b.Text = txt
+        b.Font = Enum.Font.GothamBold
+        b.TextSize = 28
+        b.BackgroundColor3 = Color3.fromRGB(40,40,40)
+        b.TextColor3 = Color3.new(1,1,1)
+        b.Parent = flyGui
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(1, 0)
+        corner.Parent = b
+        return b
+    end
+
+    local upBtn = roundBtn("▲", UDim2.new(1, -150, 1, -150))
+    local downBtn = roundBtn("▼", UDim2.new(1, -70, 1, -80))
+
+    upBtn.MouseButton1Down:Connect(function() up = 1 end)
+    upBtn.MouseButton1Up:Connect(function() up = 0 end)
+    downBtn.MouseButton1Down:Connect(function() up = -1 end)
+    downBtn.MouseButton1Up:Connect(function() up = 0 end)
+
+    local flyConnection
+    local originalGravity
+
+    local function safeFlyLoop()
+        if flyConnection then flyConnection:Disconnect() end
+
+        flyConnection = RunService.Heartbeat:Connect(function(dt)
+            if not flyOn or not hrp or not hum then return end
+
+            local move = hum.MoveDirection
+            local movement = Vector3.new(0,0,0)
+
+            if move.Magnitude > 0 then
+                movement = movement + (move * flySpeed)
+                hrp.CFrame = CFrame.new(hrp.Position, hrp.Position + move)
+            end
+
+            movement = movement + Vector3.new(0, up * flySpeed, 0)
+
+            if movement.Magnitude > 0 then
+                hrp.AssemblyLinearVelocity = movement * 10
+            else
+                hrp.AssemblyLinearVelocity = Vector3.new(0,0,0)
+            end
+
+            hrp.AssemblyAngularVelocity = Vector3.new(0,0,0)
+        end)
+    end
+
+    toggle.MouseButton1Click:Connect(function()
+        flyOn = not flyOn
+        toggle.Text = flyOn and "🚀 Fly ON" or "🚀 Fly OFF"
+
+        if flyOn then
+            originalGravity = workspace.Gravity
+            workspace.Gravity = 0
+            hum.PlatformStand = true
+            safeFlyLoop()
+            DiscordLib:Notification("Fly Orpheus", "Fly ativado! Velocidade: " .. flySpeed, "ok")
+        else
+            workspace.Gravity = originalGravity or 196.2
+            up = 0
+            hum.PlatformStand = false
+            hrp.AssemblyLinearVelocity = Vector3.new(0,0,0)
+            hrp.AssemblyAngularVelocity = Vector3.new(0,0,0)
+            DiscordLib:Notification("Fly Orpheus", "Fly desativado!", "fail")
+        end
+    end)
+
+    LocalPlayer.CharacterAdded:Connect(function(c)
+        char = c
+        hrp = c:WaitForChild("HumanoidRootPart")
+        hum = c:WaitForChild("Humanoid")
+
+        flyOn = false
+        up = 0
+        toggle.Text = "🚀 Fly OFF"
+
+        if originalGravity then
+            workspace.Gravity = originalGravity
+        end
+        
+        hum.PlatformStand = false
+
+        task.wait(1)
+        safeFlyLoop()
+    end)
+
+    flyGui.Destroying:Connect(function()
+        if flyConnection then flyConnection:Disconnect() end
+        if originalGravity then workspace.Gravity = originalGravity end
+        if flyOn and hum then hum.PlatformStand = false end
+    end)
+
+    DiscordLib:Notification("Fly Orpheus", "Interface do Fly carregada!", "ok")
+end)
+
+-- TextBox para Velocidade do Fly
+OutrosTab:Channel("Movimento"):Textbox("Velocidade do Fly", "Digite a velocidade (1-100)", true, function(value)
+    local num = tonumber(value)
+    if num and num >= 1 and num <= 100 then
+        flySpeed = num
+        DiscordLib:Notification("Fly Orpheus", "Velocidade do Fly definida para: " .. num, "ok")
+    else
+        DiscordLib:Notification("Erro", "Digite um número entre 1 e 100!", "fail")
+    end
+end)
+
+-- AUTO CLICKER (sem GUI)
+local AutoClick = false
+local AutoClickConnection = nil
+
+local function activatePrompt()
+    local character = LocalPlayer.Character
+    if not character then return end
+    
+    local hrp = character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("ProximityPrompt") then
+            local parent = obj.Parent
+            if parent and parent:IsA("BasePart") then
+                local dist = (parent.Position - hrp.Position).Magnitude
+                if dist < 10 then
+                    fireproximityprompt(obj)
+                end
+            end
+        end
+    end
+end
+
+local function StartAutoClick()
+    if AutoClickConnection then
+        AutoClickConnection:Disconnect()
+        AutoClickConnection = nil
+    end
+    
+    AutoClickConnection = RunService.Heartbeat:Connect(function()
+        if AutoClick then
+            pcall(activatePrompt)
+        end
+    end)
+end
+
+OutrosTab:Channel("Utilidades"):Toggle("Auto Clicker", false, function(state)
+    AutoClick = state
+    
+    if AutoClick then
+        StartAutoClick()
+        DiscordLib:Notification("Auto Clicker", "Auto Clicker ativado!", "ok")
+    else
+        if AutoClickConnection then
+            AutoClickConnection:Disconnect()
+            AutoClickConnection = nil
+        end
+        DiscordLib:Notification("Auto Clicker", "Auto Clicker desativado!", "fail")
+    end
+end)
+
+-- ABA AIMBOT
+local AimbotTab = Window:Server("Aimbot", "http://www.roblox.com/asset/?id=6031075938")
+
+-- Services
+local Camera = workspace.CurrentCamera
+local TweenService = game:GetService("TweenService")
+local CoreGui = game:GetService("CoreGui")
+
+-- Configurações do Aimbot
+local aimbotConfig = {
+    Enabled = false,
+    TeamCheck = false,
+    KillCheck = true,
+    WallCheck = false,
+    FriendlyList = {},
+    AimPart = "Head",
+    FOVRadius = 80,
+    Smoothness = 10,
+    AimLockActive = false,
+    CircleVisible = false,
+    CircleColor = Color3.fromRGB(255, 255, 255),
+    CircleTransparency = 0.7,
+    CircleThickness = 2
+}
+
+-- Criar FOV Circle
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "AimbotFOVCircle"
+ScreenGui.Parent = CoreGui
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+local FOVCircle = Instance.new("Frame")
+FOVCircle.Name = "FOVCircle"
+FOVCircle.Size = UDim2.new(0, aimbotConfig.FOVRadius * 2, 0, aimbotConfig.FOVRadius * 2)
+FOVCircle.Position = UDim2.new(0.5, 0, 0.5, 0)
+FOVCircle.AnchorPoint = Vector2.new(0.5, 0.5)
+FOVCircle.BackgroundColor3 = aimbotConfig.CircleColor
+FOVCircle.BackgroundTransparency = 1
+FOVCircle.Visible = aimbotConfig.CircleVisible
+FOVCircle.ZIndex = 5
+FOVCircle.Parent = ScreenGui
+
+local CircleCorner = Instance.new("UICorner")
+CircleCorner.CornerRadius = UDim.new(1, 0)
+CircleCorner.Parent = FOVCircle
+
+local CircleStroke = Instance.new("UIStroke")
+CircleStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+CircleStroke.Color = aimbotConfig.CircleColor
+CircleStroke.Thickness = aimbotConfig.CircleThickness
+CircleStroke.Transparency = aimbotConfig.CircleTransparency
+CircleStroke.Enabled = true
+CircleStroke.Parent = FOVCircle
+
+-- Função para atualizar o círculo FOV
+local function UpdateCircle()
+    FOVCircle.Visible = aimbotConfig.CircleVisible
+    FOVCircle.Size = UDim2.new(0, aimbotConfig.FOVRadius * 2, 0, aimbotConfig.FOVRadius * 2)
+    FOVCircle.BackgroundColor3 = aimbotConfig.CircleColor
+    CircleStroke.Color = aimbotConfig.CircleColor
+    CircleStroke.Thickness = aimbotConfig.CircleThickness
+    CircleStroke.Transparency = aimbotConfig.CircleTransparency
+end
+
+-- Função para encontrar o jogador mais próximo dentro do FOV
+local function GetClosestPlayer()
+    if not LocalPlayer or not LocalPlayer.Character then return nil end
+    
+    local MaximumDistance = aimbotConfig.FOVRadius
+    local Target = nil
+    
+    for _, Player in pairs(Players:GetPlayers()) do
+        if Player ~= LocalPlayer and Player.Character then
+            -- Verificar lista de amigos
+            if aimbotConfig.FriendlyList[Player.Name] then
+                continue
+            end
+            
+            local Character = Player.Character
+            local Humanoid = Character:FindFirstChild("Humanoid")
+            local HumanoidRootPart = Character:FindFirstChild("HumanoidRootPart")
+            local TargetPart = Character:FindFirstChild(aimbotConfig.AimPart)
+            
+            -- Verificar se o jogador é válido
+            if Humanoid and HumanoidRootPart and TargetPart then
+                -- Verificação de kill check
+                if aimbotConfig.KillCheck and Humanoid.Health <= 0 then
+                    continue
+                end
+                
+                -- Verificação de time
+                if aimbotConfig.TeamCheck then
+                    if LocalPlayer.Team and Player.Team and Player.Team == LocalPlayer.Team then
+                        continue
+                    end
+                end
+                
+                -- Wall check
+                if aimbotConfig.WallCheck then
+                    local raycastParams = RaycastParams.new()
+                    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
+                    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+                    raycastParams.IgnoreWater = true
+                    
+                    local raycastResult = workspace:Raycast(Camera.CFrame.Position, (TargetPart.Position - Camera.CFrame.Position).unit * 500, raycastParams)
+                    if raycastResult and raycastResult.Instance and not raycastResult.Instance:IsDescendantOf(Player.Character) and (raycastResult.Position - TargetPart.Position).Magnitude > 2 then
+                        continue
+                    end
+                end
+                
+                -- Converter posição para a tela
+                local ScreenPoint, OnScreen = Camera:WorldToViewportPoint(TargetPart.Position)
+                
+                if OnScreen then
+                    -- Calcular distância do centro da tela
+                    local ScreenCenter = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+                    local VectorDistance = (ScreenCenter - Vector2.new(ScreenPoint.X, ScreenPoint.Y)).Magnitude
+                    
+                    -- Verificar se está dentro do FOV
+                    if VectorDistance < MaximumDistance then
+                        MaximumDistance = VectorDistance
+                        Target = Player
+                    end
+                end
+            end
+        end
+    end
+    
+    return Target
+end
+
+-- Loop principal do aimbot
+local aimbotConnection = nil
+
+local function iniciarAimbot()
+    if aimbotConnection then return end
+    
+    aimbotConnection = RunService.RenderStepped:Connect(function()
+        UpdateCircle()
+        
+        if aimbotConfig.AimLockActive and aimbotConfig.Enabled then
+            local Target = GetClosestPlayer()
+            
+            if Target and Target.Character then
+                local TargetPart = Target.Character:FindFirstChild(aimbotConfig.AimPart)
+                
+                if TargetPart then
+                    local TargetCFrame = CFrame.new(Camera.CFrame.Position, TargetPart.Position)
+                    
+                    if aimbotConfig.Smoothness > 0 then
+                        local alpha = math.clamp(aimbotConfig.Smoothness / 100, 0.01, 1)
+                        Camera.CFrame = Camera.CFrame:Lerp(TargetCFrame, alpha)
+                    else
+                        Camera.CFrame = TargetCFrame
+                    end
+                end
+            end
+        end
+    end)
+end
+
+-- Configuração do Aimbot
+local AimbotChannel = AimbotTab:Channel("Configurações do Aimbot")
+
+AimbotChannel:Toggle("Aimbot", false, function(state)
+    aimbotConfig.Enabled = state
+    DiscordLib:Notification("Aimbot", state and "Aimbot ativado!" or "Aimbot desativado!", state and "ok" or "fail")
+end)
+
+AimbotChannel:Toggle("Aim Lock", false, function(state)
+    aimbotConfig.AimLockActive = state
+    if state and not aimbotConnection then
+        iniciarAimbot()
+    elseif not state and aimbotConnection then
+        aimbotConnection:Disconnect()
+        aimbotConnection = nil
+    end
+    DiscordLib:Notification("Aimbot", state and "Aim Lock ativado!" or "Aim Lock desativado!", state and "ok" or "fail")
+end)
+
+AimbotChannel:Toggle("FOV Circle", false, function(state)
+    aimbotConfig.CircleVisible = state
+    UpdateCircle()
+    DiscordLib:Notification("Aimbot", state and "FOV Circle ativado!" or "FOV Circle desativado!", state and "ok" or "fail")
+end)
+
+AimbotChannel:Toggle("Team Check", false, function(state)
+    aimbotConfig.TeamCheck = state
+end)
+
+AimbotChannel:Toggle("Kill Check", true, function(state)
+    aimbotConfig.KillCheck = state
+end)
+
+AimbotChannel:Toggle("Wall Check", false, function(state)
+    aimbotConfig.WallCheck = state
+end)
+
+-- Lista de amigos para Aimbot
+local aimbotFriendOptions = {}
+for _, player in ipairs(Players:GetPlayers()) do
+    if player ~= LocalPlayer then
+        table.insert(aimbotFriendOptions, player.Name)
+    end
+end
+
+AimbotChannel:Dropdown("Adicionar Amigo (Aimbot)", aimbotFriendOptions, function(value)
+    if not aimbotConfig.FriendlyList[value] then
+        aimbotConfig.FriendlyList[value] = true
+        DiscordLib:Notification("Aimbot", value .. " adicionado à lista de amigos!", "ok")
+    end
+end)
+
+AimbotChannel:Button("Limpar Lista de Amigos (Aimbot)", function()
+    aimbotConfig.FriendlyList = {}
+    DiscordLib:Notification("Aimbot", "Lista de amigos limpa!", "ok")
+end)
+
+-- Configurações do FOV
+local fovOptions = {"40", "60", "80", "100", "120", "140", "160", "180", "200"}
+AimbotChannel:Dropdown("Tamanho FOV", fovOptions, function(value)
+    local num = tonumber(value)
+    if num then
+        aimbotConfig.FOVRadius = num
+        UpdateCircle()
+        DiscordLib:Notification("Aimbot", "FOV Radius definido para: " .. num, "ok")
+    end
+end)
+
+AimbotChannel:Textbox("Smoothness", "Digite a suavidade (0-100)", true, function(value)
+    local num = tonumber(value)
+    if num and num >= 0 and num <= 100 then
+        aimbotConfig.Smoothness = num
+        DiscordLib:Notification("Aimbot", "Suavidade definida para: " .. num, "ok")
+    else
+        DiscordLib:Notification("Erro", "Digite um número entre 0 e 100!", "fail")
+    end
+end)
+
+-- Seleção de parte do corpo
+local partOptions = {"Head", "HumanoidRootPart", "UpperTorso", "LowerTorso"}
+AimbotChannel:Dropdown("Parte do Corpo", partOptions, function(value)
+    aimbotConfig.AimPart = value
+    DiscordLib:Notification("Aimbot", "Parte do corpo definida para: " .. value, "ok")
+end)
+
+-- Detectar novos jogadores para aimbot
+Players.PlayerAdded:Connect(function(player)
+    table.insert(aimbotFriendOptions, player.Name)
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+    if aimbotConfig.FriendlyList[player.Name] then
+        aimbotConfig.FriendlyList[player.Name] = nil
+    end
+end)
+
+-- ABA GUI
+local GUITab = Window:Server("GUI", "http://www.roblox.com/asset/?id=6031075938")
+
+local GUIChannel = GUITab:Channel("Abrir GUIs do Jogo")
+
+-- Função para abrir GUI Ilegal
+local function abrirIlegal()
+    local player = LocalPlayer
+    
+    local caminho = player.PlayerGui.xUI.felizo.hud.Ilegal
+    
+    if caminho then
+        caminho.Visible = true
+        DiscordLib:Notification("GUI Ilegal", "GUI Ilegal aberta com sucesso!", "ok")
+        return true
+    else
+        local playerGui = player:WaitForChild("PlayerGui")
+        local xUI = playerGui:FindFirstChild("xUI")
+        
+        if xUI then
+            local felizo = xUI:FindFirstChild("felizo")
+            if felizo then
+                local hud = felizo:FindFirstChild("hud")
+                if hud then
+                    local ilegal = hud:FindFirstChild("Ilegal")
+                    if ilegal then
+                        ilegal.Visible = true
+                        DiscordLib:Notification("GUI Ilegal", "GUI Ilegal encontrada e aberta!", "ok")
+                        return true
+                    end
+                end
+            end
+        end
+        
+        DiscordLib:Notification("Erro", "GUI Ilegal não encontrada!", "fail")
+        return false
+    end
+end
+
+GUIChannel:Button("Abrir GUI Ilegal", abrirIlegal)
+
+-- Função para abrir GUI do ATM
+local function abrirATM()
+    local player = LocalPlayer
+    
+    local caminho = player.PlayerGui.xUI.Sistemas.ATM
+    
+    if caminho then
+        caminho.Visible = true
+        DiscordLib:Notification("GUI ATM", "GUI do ATM aberta com sucesso!", "ok")
+        return true
+    else
+        local playerGui = player:WaitForChild("PlayerGui")
+        local xUI = playerGui:FindFirstChild("xUI")
+        
+        if xUI then
+            local sistemas = xUI:FindFirstChild("Sistemas")
+            if sistemas then
+                local atm = sistemas:FindFirstChild("ATM")
+                if atm then
+                    atm.Visible = true
+                    DiscordLib:Notification("GUI ATM", "GUI do ATM encontrada e aberta!", "ok")
+                    return true
+                end
+            end
+        end
+        
+        DiscordLib:Notification("Erro", "GUI do ATM não encontrada!", "fail")
+        return false
+    end
+end
+
+GUIChannel:Button("Abrir GUI ATM", abrirATM)
+
+-- Função para abrir GUI da Concessionária
+local function abrirConce()
+    local player = LocalPlayer
+    local playerGui = player:WaitForChild("PlayerGui")
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    
+    local sistemas = playerGui:FindFirstChild("xUI")
+    if sistemas then
+        local guiAlvo = sistemas:FindFirstChild("Sistemas")
+        if guiAlvo then
+            local conceGui = guiAlvo:FindFirstChild("Conce")
+            if conceGui then
+                conceGui.Visible = true
+                DiscordLib:Notification("GUI Concessionária", "GUI da Concessionária aberta com sucesso!", "ok")
+                return true
+            end
+        end
+    end
+    
+    local starterSistemas = ReplicatedStorage:FindFirstChild("xUI")
+    if starterSistemas then
+        local guiAlvo = starterSistemas:FindFirstChild("Sistemas")
+        if guiAlvo then
+            local conceGui = guiAlvo:FindFirstChild("Conce")
+            if conceGui then
+                conceGui.Visible = true
+                DiscordLib:Notification("GUI Concessionária", "GUI da Concessionária do StarterGui aberta!", "ok")
+                return true
+            end
+        end
+    end
+    
+    DiscordLib:Notification("Erro", "GUI da Concessionária não encontrada!", "fail")
+    return false
+end
+
+GUIChannel:Button("Abrir GUI Concessionária", abrirConce)
+
+-- Função para abrir GUI de Empregos
+local function abrirEmpregos()
+    local player = LocalPlayer
+    local playerGui = player:WaitForChild("PlayerGui")
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    
+    local sistemas = playerGui:FindFirstChild("xUI")
+    if sistemas then
+        local guiAlvo = sistemas:FindFirstChild("Sistemas")
+        if guiAlvo then
+            local empregosGui = guiAlvo:FindFirstChild("Empregos")
+            if empregosGui then
+                empregosGui.Visible = true
+                DiscordLib:Notification("GUI Empregos", "GUI de Empregos aberta com sucesso!", "ok")
+                return true
+            end
+        end
+    end
+    
+    local starterSistemas = ReplicatedStorage:FindFirstChild("xUI")
+    if starterSistemas then
+        local guiAlvo = starterSistemas:FindFirstChild("Sistemas")
+        if guiAlvo then
+            local empregosGui = guiAlvo:FindFirstChild("Empregos")
+            if empregosGui then
+                empregosGui.Visible = true
+                DiscordLib:Notification("GUI Empregos", "GUI de Empregos do StarterGui aberta!", "ok")
+                return true
+            end
+        end
+    end
+    
+    DiscordLib:Notification("Erro", "GUI de Empregos não encontrada!", "fail")
+    return false
+end
+
+GUIChannel:Button("Abrir GUI Empregos", abrirEmpregos)
+
+-- Reconexão quando o personagem morre
+LocalPlayer.CharacterAdded:Connect(function(character)
+    if noclip then
+        task.wait(0.5)
+        setCollisions(false)
+    end
+    
+    if AutoClick then
+        task.wait(2)
+        StartAutoClick()
+    end
+    
+    if aimbotConfig.AimLockActive and aimbotConfig.Enabled and not aimbotConnection then
+        task.wait(2)
+        iniciarAimbot()
+    end
+end)
+
+DiscordLib:Notification("ICE MENU", "Menu carregado com sucesso! 🧊", "ok")local TweenService = game:GetService("TweenService")
+
+                local LocalPlayer = Players.LocalPlayer
+                local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+                local Humanoid = Character:WaitForChild("Humanoid")
+
+                -- Variáveis
+                local flyEnabled = false
+                local currentVehicle, bodyGyro, bodyVelocity
+                local flySpeed = 50
+                local moveDirection = Vector3.zero
+                local moveY = 0
+
+                -- Função pra detectar veículo
+                local function getVehicle()
+                    if Character and Character:FindFirstChildOfClass("Humanoid") then
+                        local seat = Character.Humanoid.SeatPart
+                        if seat and seat:IsA("VehicleSeat") then
+                            return seat.Parent
+                        end
+                    end
+                    return nil
+                end
+
+                -- Liga/desliga o fly
+                local function toggleFly(state)
+                    flyEnabled = state
+                    currentVehicle = getVehicle()
+
+                    if flyEnabled and currentVehicle then
+                        local root = currentVehicle:FindFirstChild("PrimaryPart") or currentVehicle:FindFirstChildWhichIsA("BasePart")
+                        if not root then 
+                            flyEnabled = false
+                            return 
+                        end
+
+                        -- Remove antigos se existirem
+                        if bodyGyro then bodyGyro:Destroy() end
+                        if bodyVelocity then bodyVelocity:Destroy() end
+
+                        bodyGyro = Instance.new("BodyGyro")
+                        bodyGyro.D = 500
+                        bodyGyro.P = 10000
+                        bodyGyro.MaxTorque = Vector3.new(40000, 40000, 40000)
+                        bodyGyro.CFrame = root.CFrame
+                        bodyGyro.Parent = root
+
+                        bodyVelocity = Instance.new("BodyVelocity")
+                        bodyVelocity.MaxForce = Vector3.new(40000, 40000, 40000)
+                        bodyVelocity.Velocity = Vector3.zero
+                        bodyVelocity.Parent = root
+                        
+                        WindUI:Notify({
+                            Title = "Fly Veículo",
+                            Content = "Fly ON - Veículo: " .. currentVehicle.Name,
+                            Duration = 3,
+                            Icon = "car"
+                        })
+                    else
+                        if bodyGyro then 
+                            bodyGyro:Destroy() 
+                            bodyGyro = nil 
+                        end
+                        if bodyVelocity then 
+                            bodyVelocity:Destroy() 
+                            bodyVelocity = nil 
+                        end
+                        moveDirection = Vector3.zero
+                        moveY = 0
+                        WindUI:Notify({
+                            Title = "Fly Veículo",
+                            Content = "Fly OFF",
+                            Duration = 3,
+                            Icon = "car"
+                        })
+                    end
+                end
+
+                -- Atualiza movimento
+                RunService.Heartbeat:Connect(function()
+                    if flyEnabled and currentVehicle and bodyGyro and bodyVelocity then
+                        local root = currentVehicle:FindFirstChild("PrimaryPart") or currentVehicle:FindFirstChildWhichIsA("BasePart")
+                        if not root then return end
+
+                        -- Pega a direção do movimento do Humanoid (touch control)
+                        local move = Humanoid.MoveDirection
+                        local horizontalMove = Vector3.new(move.X, 0, move.Z)
+                        
+                        -- Combina movimento horizontal com vertical
+                        local finalMove = horizontalMove + Vector3.new(0, moveY, 0)
+                        
+                        if finalMove.Magnitude > 0 then
+                            -- Converte para espaço mundial relativo à rotação do veículo
+                            local worldMove = root.CFrame:VectorToWorldSpace(finalMove)
+                            bodyVelocity.Velocity = worldMove * flySpeed
+                        else
+                            bodyVelocity.Velocity = Vector3.zero
+                        end
+                        
+                        -- Mantém a rotação atual
+                        bodyGyro.CFrame = root.CFrame
+                    end
+                end)
+
+                -- GUI do Fly Veículo
+                local ScreenGui = Instance.new("ScreenGui")
+                ScreenGui.Name = "FlyCarSystem"
+                ScreenGui.ResetOnSpawn = false
+                ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+                ScreenGui.Parent = game.CoreGui
+
+                local MainToggle = Instance.new("TextButton")
+                MainToggle.Size = UDim2.new(0, 120, 0, 45)
+                MainToggle.Position = UDim2.new(0.05, 0, 0.7, 0)
+                MainToggle.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+                MainToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+                MainToggle.TextScaled = true
+                MainToggle.Text = "🪶 GUI: ON"
+                MainToggle.Font = Enum.Font.GothamBold
+                MainToggle.ZIndex = 2
+                MainToggle.Parent = ScreenGui
+
+                Instance.new("UICorner", MainToggle)
+
+                local Frame = Instance.new("Frame")
+                Frame.Size = UDim2.new(0, 250, 0, 320)
+                Frame.Position = UDim2.new(0.65, 0, 0.4, 0)
+                Frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+                Frame.BackgroundTransparency = 0.1
+                Frame.Active = true
+                Frame.Draggable = true
+                Frame.Visible = true
+                Frame.ZIndex = 2
+                Frame.Parent = ScreenGui
+
+                local FrameCorner = Instance.new("UICorner", Frame)
+                FrameCorner.CornerRadius = UDim.new(0, 12)
+
+                local Title = Instance.new("TextLabel")
+                Title.Size = UDim2.new(1, 0, 0, 40)
+                Title.Position = UDim2.new(0, 0, 0, 5)
+                Title.BackgroundTransparency = 1
+                Title.Text = "🚗 FlyCar Control"
+                Title.TextColor3 = Color3.fromRGB(0, 170, 255)
+                Title.Font = Enum.Font.GothamBold
+                Title.TextSize = 18
+                Title.ZIndex = 3
+                Title.Parent = Frame
+
+                local FlyBtn = Instance.new("TextButton")
+                FlyBtn.Size = UDim2.new(0.9, 0, 0, 50)
+                FlyBtn.Position = UDim2.new(0.05, 0, 0.15, 0)
+                FlyBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+                FlyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+                FlyBtn.Text = "🚀 FLY: OFF"
+                FlyBtn.TextSize = 16
+                FlyBtn.Font = Enum.Font.GothamBold
+                FlyBtn.ZIndex = 3
+                FlyBtn.Parent = Frame
+
+                local FlyBtnCorner = Instance.new("UICorner", FlyBtn)
+                FlyBtnCorner.CornerRadius = UDim.new(0, 8)
+
+                local UpBtn = Instance.new("TextButton")
+                UpBtn.Size = UDim2.new(0.42, 0, 0, 50)
+                UpBtn.Position = UDim2.new(0.05, 0, 0.35, 0)
+                UpBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+                UpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+                UpBtn.Text = "⬆️ SUBIR"
+                UpBtn.TextSize = 14
+                UpBtn.Font = Enum.Font.GothamBold
+                UpBtn.ZIndex = 3
+                UpBtn.Parent = Frame
+
+                local UpBtnCorner = Instance.new("UICorner", UpBtn)
+                UpBtnCorner.CornerRadius = UDim.new(0, 8)
+
+                local DownBtn = Instance.new("TextButton")
+                DownBtn.Size = UDim2.new(0.42, 0, 0, 50)
+                DownBtn.Position = UDim2.new(0.53, 0, 0.35, 0)
+                DownBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+                DownBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+                DownBtn.Text = "⬇️ DESCER"
+                DownBtn.TextSize = 14
+                DownBtn.Font = Enum.Font.GothamBold
+                DownBtn.ZIndex = 3
+                DownBtn.Parent = Frame
+
+                local DownBtnCorner = Instance.new("UICorner", DownBtn)
+                DownBtnCorner.CornerRadius = UDim.new(0, 8)
+
+                local SpeedLabel = Instance.new("TextLabel")
+                SpeedLabel.Size = UDim2.new(1, 0, 0, 40)
+                SpeedLabel.Position = UDim2.new(0, 0, 0.55, 0)
+                SpeedLabel.BackgroundTransparency = 1
+                SpeedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+                SpeedLabel.Text = "Velocidade: " .. flySpeed
+                SpeedLabel.Font = Enum.Font.GothamBold
+                SpeedLabel.TextSize = 16
+                SpeedLabel.ZIndex = 3
+                SpeedLabel.Parent = Frame
+
+                local PlusBtn = Instance.new("TextButton")
+                PlusBtn.Size = UDim2.new(0.42, 0, 0, 45)
+                PlusBtn.Position = UDim2.new(0.05, 0, 0.72, 0)
+                PlusBtn.BackgroundColor3 = Color3.fromRGB(40, 120, 40)
+                PlusBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+                PlusBtn.Text = "➕ +12"
+                PlusBtn.TextSize = 14
+                PlusBtn.Font = Enum.Font.GothamBold
+                PlusBtn.ZIndex = 3
+                PlusBtn.Parent = Frame
+
+                local PlusBtnCorner = Instance.new("UICorner", PlusBtn)
+                PlusBtnCorner.CornerRadius = UDim.new(0, 8)
+
+                local MinusBtn = Instance.new("TextButton")
+                MinusBtn.Size = UDim2.new(0.42, 0, 0, 45)
+                MinusBtn.Position = UDim2.new(0.53, 0, 0.72, 0)
+                MinusBtn.BackgroundColor3 = Color3.fromRGB(120, 40, 40)
+                MinusBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+                MinusBtn.Text = "➖ -12"
+                MinusBtn.TextSize = 14
+                MinusBtn.Font = Enum.Font.GothamBold
+                MinusBtn.ZIndex = 3
+                MinusBtn.Parent = Frame
+
+                local MinusBtnCorner = Instance.new("UICorner", MinusBtn)
+                MinusBtnCorner.CornerRadius = UDim.new(0, 8)
+
+                local StatusLabel = Instance.new("TextLabel")
+                StatusLabel.Size = UDim2.new(1, 0, 0, 30)
+                StatusLabel.Position = UDim2.new(0, 0, 0.9, 0)
+                StatusLabel.BackgroundTransparency = 1
+                StatusLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+                StatusLabel.Text = "Entre em um veículo"
+                StatusLabel.Font = Enum.Font.Gotham
+                StatusLabel.TextSize = 12
+                StatusLabel.ZIndex = 3
+                StatusLabel.Parent = Frame
+
+                -- Eventos dos botões
+                MainToggle.MouseButton1Click:Connect(function()
+                    local uiVisible = Frame.Visible
+                    uiVisible = not uiVisible
+                    Frame.Visible = uiVisible
+                    MainToggle.Text = uiVisible and "🪶 GUI: ON" or "🪶 GUI: OFF"
+                end)
+
+                FlyBtn.MouseButton1Click:Connect(function()
+                    if not getVehicle() then
+                        StatusLabel.Text = "ERRO: Entre em um veículo primeiro!"
+                        task.wait(2)
+                        StatusLabel.Text = "Entre em um veículo"
+                        return
+                    end
+                    
+                    toggleFly(not flyEnabled)
+                    
+                    if flyEnabled then
+                        FlyBtn.Text = "🚀 FLY: ON"
+                        FlyBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+                        StatusLabel.Text = "Fly ATIVADO"
+                    else
+                        FlyBtn.Text = "🚀 FLY: OFF"
+                        FlyBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+                        StatusLabel.Text = "Fly DESATIVADO"
+                    end
+                end)
+
+                UpBtn.MouseButton1Down:Connect(function()
+                    moveY = 1
+                end)
+
+                UpBtn.MouseButton1Up:Connect(function()
+                    moveY = 0
+                end)
+
+                DownBtn.MouseButton1Down:Connect(function()
+                    moveY = -1
+                end)
+
+                DownBtn.MouseButton1Up:Connect(function()
+                    moveY = 0
+                end)
+
+                PlusBtn.MouseButton1Click:Connect(function()
+                    flySpeed = math.clamp(flySpeed + 12, 12, 500)
+                    SpeedLabel.Text = "Velocidade: " .. flySpeed
+                    StatusLabel.Text = "Velocidade: " .. flySpeed
+                end)
+
+                MinusBtn.MouseButton1Click:Connect(function()
+                    flySpeed = math.clamp(flySpeed - 12, 12, 500)
+                    SpeedLabel.Text = "Velocidade: " .. flySpeed
+                    StatusLabel.Text = "Velocidade: " .. flySpeed
+                end)
+
+                -- Atualiza status do veículo
+                RunService.Heartbeat:Connect(function()
+                    local vehicle = getVehicle()
+                    if vehicle then
+                        StatusLabel.Text = "Veículo: " .. vehicle.Name
+                        if not flyEnabled then
+                            FlyBtn.BackgroundColor3 = Color3.fromRGB(200, 150, 50)
+                            FlyBtn.Text = "🚀 FLY: PRONTO"
+                        end
+                    else
+                        if flyEnabled then
+                            toggleFly(false)
+                            FlyBtn.Text = "🚀 FLY: OFF"
+                            FlyBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+                        end
+                        StatusLabel.Text = "Entre em um veículo"
+                    end
+                end)
+
+                WindUI:Notify({
+                    Title = "Fly Veículo",
+                    Content = "Sistema Fly Veículo carregado!",
+                    Duration = 3,
+                    Icon = "car"
+                })
+            end)
+            
+            coroutine.resume(flyVeiculoCoroutine)
+        else
+            if flyVeiculoCoroutine then
+                coroutine.close(flyVeiculoCoroutine)
+                flyVeiculoCoroutine = nil
+            end
+            WindUI:Notify({
+                Title = "Fly Veículo",
+                Content = "Sistema desativado!",
+                Duration = 2,
+                Icon = "car"
+            })
+        end
+    end
+
+    SectionOutros:Toggle({
+        Title = "Fly Veículo",
+        Description = "Permite voar com veículos",
+        Default = false,
+        Callback = function(state)
+            toggleFlyVeiculo(state)
+        end
+    })
+
+end)()
