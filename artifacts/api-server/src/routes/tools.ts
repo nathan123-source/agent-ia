@@ -19,7 +19,7 @@ async function callGemini(systemPrompt: string, userPrompt: string): Promise<str
     contents: [{ role: "user", parts: [{ text: userPrompt }] }],
     config: {
       systemInstruction: systemPrompt,
-      maxOutputTokens: 8192,
+      maxOutputTokens: 65536,
       temperature: 0.3,
     },
   });

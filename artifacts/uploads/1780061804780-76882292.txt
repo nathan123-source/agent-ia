@@ -1,0 +1,991 @@
+local Player = game.Players.LocalPlayer
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+-- Variáveis globais
+local menuAtivo = true
+local guiVisivel = true
+local estaMinimizado = false
+local posicaoOriginal = nil
+local isMobile = UserInputService.TouchEnabled
+local scaleMultiplier = isMobile and 0.8 or 1
+
+-- Variáveis para os sistemas
+local aimbotEnabled = false
+local noclipAtivado = false
+local antiAlgemasAtivado = false
+local noclipConexao = nil
+local antiAlgemasConnection = nil
+local aimbotConnection = nil
+
+-- Sistema de salvamento de estados
+local toggleStates = {
+    ["Noclip Automático"] = false,
+    ["Anti-Algemas"] = false,
+    ["Aimbot (FOV)"] = false,
+    ["Fly PC (E)"] = false
+}
+
+-- Criar a GUI
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "IceMenu"
+screenGui.Parent = Player:WaitForChild("PlayerGui")
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.ResetOnSpawn = false
+
+-- Container principal
+local mainContainer = Instance.new("Frame")
+mainContainer.Name = "MainContainer"
+mainContainer.Parent = screenGui
+mainContainer.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+mainContainer.BackgroundTransparency = 0.05
+mainContainer.Position = UDim2.new(0.5, 0, 0.5, 0)
+mainContainer.Size = UDim2.new(0, 750 * scaleMultiplier, 0, 500 * scaleMultiplier)
+mainContainer.AnchorPoint = Vector2.new(0.5, 0.5)
+mainContainer.ClipsDescendants = true
+mainContainer.ZIndex = 1
+
+-- Arredondar bordas
+local mainCorner = Instance.new("UICorner")
+mainCorner.CornerRadius = UDim.new(0, 12)
+mainCorner.Parent = mainContainer
+
+-- Borda
+local mainStroke = Instance.new("UIStroke")
+mainStroke.Parent = mainContainer
+mainStroke.Color = Color3.fromRGB(0, 100, 200)
+mainStroke.Thickness = 2
+mainStroke.Transparency = 0.7
+
+-- Frame para arrastar
+local dragFrame = Instance.new("Frame")
+dragFrame.Name = "DragFrame"
+dragFrame.Parent = mainContainer
+dragFrame.BackgroundTransparency = 1
+dragFrame.Size = UDim2.new(1, 0, 0, 60)
+dragFrame.ZIndex = 10
+
+-- Frame de seleção de abas
+local selecionaraba = Instance.new("ScrollingFrame")
+selecionaraba.Name = "selecionaraba"
+selecionaraba.Parent = mainContainer
+selecionaraba.BackgroundColor3 = Color3.fromRGB(240, 240, 245)
+selecionaraba.BackgroundTransparency = 0.1
+selecionaraba.BorderSizePixel = 0
+selecionaraba.Position = UDim2.new(0, 0, 0, 80)
+selecionaraba.Size = UDim2.new(0, 150 * scaleMultiplier, 0, 340 * scaleMultiplier)
+selecionaraba.CanvasSize = UDim2.new(0, 0, 0, 0)
+selecionaraba.ScrollBarThickness = 4
+selecionaraba.ScrollBarImageColor3 = Color3.fromRGB(0, 100, 200)
+selecionaraba.VerticalScrollBarInset = Enum.ScrollBarInset.Always
+selecionaraba.ZIndex = 5
+
+local UICorner_2 = Instance.new("UICorner")
+UICorner_2.CornerRadius = UDim.new(0, 8)
+UICorner_2.Parent = selecionaraba
+
+-- Enfeite
+local enfeite = Instance.new("Frame")
+enfeite.Name = "enfeite"
+enfeite.Parent = selecionaraba
+enfeite.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
+enfeite.BackgroundTransparency = 0.3
+enfeite.BorderSizePixel = 0
+enfeite.Position = UDim2.new(0.0583333336, 0, 0.05, 0)
+enfeite.Size = UDim2.new(0, 140 * scaleMultiplier, 0, 1.5)
+Instance.new("UICorner", enfeite)
+
+-- Layout das abas
+local abaLayout = Instance.new("UIListLayout")
+abaLayout.Parent = selecionaraba
+abaLayout.SortOrder = Enum.SortOrder.LayoutOrder
+abaLayout.Padding = UDim.new(0, 5)
+
+-- Cabeçalho
+local head = Instance.new("Frame")
+head.Name = "head"
+head.Parent = mainContainer
+head.BackgroundColor3 = Color3.fromRGB(250, 250, 255)
+head.BackgroundTransparency = 0.1
+head.BorderSizePixel = 0
+head.Position = UDim2.new(0, 0, 0, 0)
+head.Size = UDim2.new(0, 150 * scaleMultiplier, 0, 80 * scaleMultiplier)
+head.ZIndex = 5
+
+local UICorner_3 = Instance.new("UICorner")
+UICorner_3.CornerRadius = UDim.new(0, 8)
+UICorner_3.Parent = head
+
+-- Logo
+local iceimagem = Instance.new("ImageButton")
+iceimagem.Name = "iceimagem"
+iceimagem.Parent = head
+iceimagem.BackgroundTransparency = 1
+iceimagem.Position = UDim2.new(0.1, 0, 0.1, 0)
+iceimagem.Size = UDim2.new(0, 50 * scaleMultiplier, 0, 50 * scaleMultiplier)
+iceimagem.Image = "rbxassetid://104305180176353"
+iceimagem.ScaleType = Enum.ScaleType.Fit
+iceimagem.ZIndex = 6
+
+-- Nome do menu
+local nome = Instance.new("TextLabel")
+nome.Name = "nome"
+nome.Parent = head
+nome.BackgroundTransparency = 1
+nome.Position = UDim2.new(0, 0, 0.65, 0)
+nome.Size = UDim2.new(1, 0, 0, 25 * scaleMultiplier)
+nome.Font = Enum.Font.GothamBold
+nome.Text = "ICE MENU"
+nome.TextColor3 = Color3.fromRGB(0, 100, 200)
+nome.TextSize = 16
+nome.TextScaled = false
+nome.ZIndex = 6
+
+-- Função para criar botões de aba
+local function criarBotaoAba(nome, posicaoY, iconeId)
+    local botao = Instance.new("TextButton")
+    botao.Name = nome:lower()
+    botao.Parent = selecionaraba
+    botao.BackgroundColor3 = Color3.fromRGB(230, 230, 235)
+    botao.BackgroundTransparency = 0.3
+    botao.BorderSizePixel = 0
+    botao.Position = UDim2.new(0.05, 0, posicaoY, 0)
+    botao.Size = UDim2.new(0.9, 0, 0, 35 * scaleMultiplier)
+    botao.Font = Enum.Font.Gotham
+    botao.Text = nome
+    botao.TextColor3 = Color3.fromRGB(60, 60, 70)
+    botao.TextSize = 14
+    botao.TextWrapped = true
+    botao.ZIndex = 6
+    
+    local botaoCorner = Instance.new("UICorner")    
+    botaoCorner.CornerRadius = UDim.new(0, 6)    
+    botaoCorner.Parent = botao    
+    
+    local icone = Instance.new("ImageLabel")    
+    icone.Parent = botao    
+    icone.BackgroundTransparency = 1    
+    icone.Position = UDim2.new(0.05, 0, 0.2, 0)    
+    icone.Size = UDim2.new(0, 20 * scaleMultiplier, 0, 20 * scaleMultiplier)    
+    icone.Image = iconeId    
+    icone.ImageColor3 = Color3.fromRGB(0, 100, 200)    
+    icone.ZIndex = 6
+    
+    botao.MouseEnter:Connect(function()    
+        if menuAtivo then
+            botao.BackgroundColor3 = Color3.fromRGB(220, 220, 225)    
+        end
+    end)
+    
+    botao.MouseLeave:Connect(function()    
+        if menuAtivo then
+            botao.BackgroundColor3 = Color3.fromRGB(230, 230, 235)    
+        end
+    end)    
+    
+    return botao
+end
+
+-- Criar abas
+local inicio = criarBotaoAba("Inicio", 0.12, "rbxassetid://10814531047")
+local combate = criarBotaoAba("Combate", 0.24, "rbxassetid://16029076040")
+local esp = criarBotaoAba("Esp's", 0.36, "rbxassetid://121658694000474")
+local aimbots = criarBotaoAba("Aimbots", 0.48, "rbxassetid://13557340523")
+local revistar = criarBotaoAba("+Revistar", 0.60, "rbxassetid://2815418737")
+local teleporte = criarBotaoAba("Teleportes", 0.72, "rbxassetid://6723742952")
+local veiculo = criarBotaoAba("Veículo", 0.82, "rbxassetid://12812871709")
+local farm = criarBotaoAba("Farm", 0.92, "rbxassetid://11388221219")
+local novaAba1 = criarBotaoAba("Configurações", 1.02, "rbxassetid://6023426915")
+local novaAba2 = criarBotaoAba("Extras", 1.12, "rbxassetid://6023426915")
+
+-- Barra superior
+local coisasdaaba = Instance.new("Frame")
+coisasdaaba.Name = "coisasdaaba"
+coisasdaaba.Parent = mainContainer
+coisasdaaba.BackgroundColor3 = Color3.fromRGB(250, 250, 255)
+coisasdaaba.BackgroundTransparency = 0.1
+coisasdaaba.BorderSizePixel = 0
+coisasdaaba.Position = UDim2.new(0.2, 0, 0, 0)
+coisasdaaba.Size = UDim2.new(0, 600 * scaleMultiplier, 0, 60 * scaleMultiplier)
+coisasdaaba.ZIndex = 5
+
+local UICorner_4 = Instance.new("UICorner")
+UICorner_4.CornerRadius = UDim.new(0, 8)
+UICorner_4.Parent = coisasdaaba
+
+-- Enfeite superior
+local enfeite_2 = Instance.new("Frame")
+enfeite_2.Name = "enfeite"
+enfeite_2.Parent = coisasdaaba
+enfeite_2.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
+enfeite_2.BackgroundTransparency = 0.4
+enfeite_2.BorderSizePixel = 0
+enfeite_2.Position = UDim2.new(0.0334871747, 0, 1.08474576, 0)
+enfeite_2.Size = UDim2.new(0, 580 * scaleMultiplier, 0, 2)
+Instance.new("UICorner", enfeite_2)
+
+-- Nome da aba atual
+local nomeaba = Instance.new("TextLabel")
+nomeaba.Name = "nomeaba"
+nomeaba.Parent = coisasdaaba
+nomeaba.BackgroundTransparency = 1
+nomeaba.Position = UDim2.new(0.02, 0, 0.1, 0)
+nomeaba.Size = UDim2.new(0, 150 * scaleMultiplier, 0, 40 * scaleMultiplier)
+nomeaba.Font = Enum.Font.GothamBold
+nomeaba.Text = "Inicio"
+nomeaba.TextColor3 = Color3.fromRGB(0, 100, 200)
+nomeaba.TextSize = 18
+nomeaba.TextXAlignment = Enum.TextXAlignment.Left
+nomeaba.ZIndex = 6
+
+-- Botão minimizar
+local minimizar = Instance.new("TextButton")
+minimizar.Name = "minimizar"
+minimizar.Parent = coisasdaaba
+minimizar.BackgroundColor3 = Color3.fromRGB(240, 240, 245)
+minimizar.BorderSizePixel = 0
+minimizar.Position = UDim2.new(0.78, 0, 0.15, 0)
+minimizar.Size = UDim2.new(0, 30 * scaleMultiplier, 0, 30 * scaleMultiplier)
+minimizar.Font = Enum.Font.GothamBold
+minimizar.Text = "-"
+minimizar.TextColor3 = Color3.fromRGB(0, 150, 0)
+minimizar.TextSize = 14
+minimizar.ZIndex = 10
+Instance.new("UICorner", minimizar).CornerRadius = UDim.new(0, 6)
+
+-- Botão fechar
+local fechar = Instance.new("TextButton")
+fechar.Name = "fechar"
+fechar.Parent = coisasdaaba
+fechar.BackgroundColor3 = Color3.fromRGB(240, 240, 245)
+fechar.BorderSizePixel = 0
+fechar.Position = UDim2.new(0.85, 0, 0.15, 0)
+fechar.Size = UDim2.new(0, 30 * scaleMultiplier, 0, 30 * scaleMultiplier)
+fechar.Font = Enum.Font.GothamBold
+fechar.Text = "X"
+fechar.TextColor3 = Color3.fromRGB(200, 50, 50)
+fechar.TextSize = 14
+fechar.ZIndex = 10
+Instance.new("UICorner", fechar).CornerRadius = UDim.new(0, 6)
+
+-- Campo de pesquisa
+local pesquisar = Instance.new("TextBox")
+pesquisar.Name = "pesquisar"
+pesquisar.Parent = coisasdaaba
+pesquisar.BackgroundColor3 = Color3.fromRGB(240, 240, 245)
+pesquisar.BackgroundTransparency = 0.3
+pesquisar.BorderSizePixel = 0
+pesquisar.Position = UDim2.new(0.5, 0, 0.15, 0)
+pesquisar.Size = UDim2.new(0, 160 * scaleMultiplier, 0, 30 * scaleMultiplier)
+pesquisar.Font = Enum.Font.Gotham
+pesquisar.PlaceholderText = "Pesquisar..."
+pesquisar.Text = ""
+pesquisar.TextColor3 = Color3.fromRGB(60, 60, 70)
+pesquisar.TextSize = 14
+pesquisar.PlaceholderColor3 = Color3.fromRGB(120, 120, 130)
+pesquisar.ZIndex = 10
+
+local UICorner_7 = Instance.new("UICorner")
+UICorner_7.CornerRadius = UDim.new(0, 6)
+UICorner_7.Parent = pesquisar
+
+-- Ícone de lupa
+local lupa = Instance.new("ImageLabel")
+lupa.Name = "lupa"
+lupa.Parent = pesquisar
+lupa.BackgroundTransparency = 1
+lupa.Position = UDim2.new(0.05, 0, 0.15, 0)
+lupa.Size = UDim2.new(0, 20 * scaleMultiplier, 0, 20 * scaleMultiplier)
+lupa.Image = "rbxassetid://5077490896"
+lupa.ImageColor3 = Color3.fromRGB(0, 100, 200)
+lupa.ZIndex = 10
+
+-- Área de conteúdo
+local abaexemplo = Instance.new("Frame")
+abaexemplo.Name = "abaexemplo"
+abaexemplo.Parent = mainContainer
+abaexemplo.BackgroundColor3 = Color3.fromRGB(250, 250, 255)
+abaexemplo.BackgroundTransparency = 0.1
+abaexemplo.BorderSizePixel = 0
+abaexemplo.Position = UDim2.new(0.2, 0, 0.12, 0)
+abaexemplo.Size = UDim2.new(0, 600 * scaleMultiplier, 0, 370 * scaleMultiplier)
+abaexemplo.ZIndex = 5
+
+local UICorner_6 = Instance.new("UICorner")
+UICorner_6.CornerRadius = UDim.new(0, 8)
+UICorner_6.Parent = abaexemplo
+
+-- Scroll frame para conteúdo
+local ScrollFrame = Instance.new("ScrollingFrame")
+ScrollFrame.Parent = abaexemplo
+ScrollFrame.BackgroundTransparency = 1
+ScrollFrame.BorderSizePixel = 0
+ScrollFrame.Size = UDim2.new(1, 0, 1, 0)
+ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+ScrollFrame.ScrollBarThickness = 4
+ScrollFrame.ScrollBarImageColor3 = Color3.fromRGB(0, 100, 200)
+ScrollFrame.VerticalScrollBarInset = Enum.ScrollBarInset.Always
+ScrollFrame.ZIndex = 6
+
+local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.Parent = ScrollFrame
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Padding = UDim.new(0, 8)
+
+-- Variáveis para controle das opções
+local opcoes = {}
+local abaAtual = "Inicio"
+
+-- Sistema de Aimbot
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+local fovCircle = nil
+local lockedTarget = nil
+local FOVRadius = 200
+
+local function criarFOVCircle()
+    if fovCircle then
+        fovCircle:Remove()
+    end
+    
+    fovCircle = Drawing.new("Circle")
+    fovCircle.Radius = FOVRadius
+    fovCircle.Color = Color3.fromRGB(0, 255, 0)
+    fovCircle.Thickness = 2
+    fovCircle.Filled = false
+    fovCircle.Visible = aimbotEnabled
+    fovCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+end
+
+local function getBestTarget()
+    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    local closest = nil
+    local closestDist = math.huge
+
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local hum = player.Character:FindFirstChild("Humanoid")
+            if hum and hum.Health > 0 then
+                local head = player.Character:FindFirstChild("Cabesa") or player.Character:FindFirstChild("Head")
+                if head then
+                    local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
+                    if onScreen then
+                        local rayParams = RaycastParams.new()
+                        rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
+                        rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+
+                        local rayResult = workspace:Raycast(Camera.CFrame.Position, (head.Position - Camera.CFrame.Position).Unit * 1000, rayParams)
+                        if rayResult and rayResult.Instance:IsDescendantOf(player.Character) then
+                            local dist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
+                            if dist < closestDist and dist <= FOVRadius then
+                                closest = head
+                                closestDist = dist
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    return closest
+end
+
+local function toggleAimbot(ativado)
+    aimbotEnabled = ativado
+    toggleStates["Aimbot (FOV)"] = ativado
+    
+    if ativado then
+        criarFOVCircle()
+        
+        aimbotConnection = RunService.RenderStepped:Connect(function(delta)
+            if not aimbotEnabled then
+                if fovCircle then
+                    fovCircle.Visible = false
+                end
+                return
+            end
+
+            -- Mantém o círculo sempre no centro da tela
+            if fovCircle then
+                fovCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+                fovCircle.Radius = FOVRadius
+                fovCircle.Visible = true
+            end
+
+            local target = getBestTarget()
+            if target then
+                Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position)
+                lockedTarget = target
+            end
+        end)
+        
+        print("🎯 Aimbot ativado")
+    else
+        if aimbotConnection then
+            aimbotConnection:Disconnect()
+            aimbotConnection = nil
+        end
+        
+        if fovCircle then
+            fovCircle.Visible = false
+        end
+        
+        lockedTarget = nil
+        print("🎯 Aimbot desativado")
+    end
+end
+
+-- Sistema Noclip
+local function setCollisions(collide)
+    if Player.Character then
+        for _, part in ipairs(Player.Character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = collide
+            end
+        end
+    end
+end
+
+local function toggleNoclip(ativado)
+    noclipAtivado = ativado
+    toggleStates["Noclip Automático"] = ativado
+    
+    if ativado then
+        if noclipConexao then
+            noclipConexao:Disconnect()
+        end
+        
+        noclipConexao = RunService.RenderStepped:Connect(function()
+            setCollisions(false)
+        end)
+        
+        print("✅ Noclip ativado")
+    else
+        if noclipConexao then
+            noclipConexao:Disconnect()
+            noclipConexao = nil
+        end
+        
+        setCollisions(true)
+        print("✅ Noclip desativado")
+    end
+end
+
+-- Sistema Anti-Algemas
+local HandcuffEvent = ReplicatedStorage:FindFirstChild("HandcuffPlayer")
+
+local function toggleAntiAlgemas(ativado)
+    antiAlgemasAtivado = ativado
+    toggleStates["Anti-Algemas"] = ativado
+    
+    if ativado then
+        if HandcuffEvent then
+            antiAlgemasConnection = HandcuffEvent.OnClientEvent:Connect(function(officer, victim)
+                -- Se somos a vítima, prevenir o efeito de algema
+                if victim == Player then
+                    -- Restaurar movimentação imediatamente
+                    local humanoid = Player.Character and Player.Character:FindFirstChild("Humanoid")
+                    if humanoid then
+                        humanoid.WalkSpeed = 16  -- Velocidade normal
+                        humanoid.JumpPower = 50  -- Pulo normal
+                    end
+                    
+                    -- Opcional: Notificar que foi protegido
+                    print("🛡️ Anti-Algemas: Protegido contra algema de " .. officer.Name)
+                end
+            end)
+        end
+        
+        -- Monitorar também mudanças no WalkSpeed (backup)
+        if Player.Character then
+            local humanoid = Player.Character:FindFirstChild("Humanoid")
+            if humanoid then
+                humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
+                    if antiAlgemasAtivado and humanoid.WalkSpeed == 0 then
+                        humanoid.WalkSpeed = 16
+                    end
+                end)
+            end
+        end
+        
+        Player.CharacterAdded:Connect(function(character)
+            local humanoid = character:WaitForChild("Humanoid")
+            humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
+                if antiAlgemasAtivado and humanoid.WalkSpeed == 0 then
+                    humanoid.WalkSpeed = 16
+                end
+            end)
+        end)
+        
+        print("🛡️ Anti-Algemas ativado")
+    else
+        if antiAlgemasConnection then
+            antiAlgemasConnection:Disconnect()
+            antiAlgemasConnection = nil
+        end
+        
+        print("🛡️ Anti-Algemas desativado")
+    end
+end
+
+-- Conectar evento de character para manter noclip
+Player.CharacterAdded:Connect(function()
+    task.wait(0.5)
+    if noclipAtivado then
+        setCollisions(false)
+    end
+end)
+
+-- Função para criar toggle
+local function criarToggle(nome, callback)
+    local toggleFrame = Instance.new("Frame")
+    toggleFrame.Parent = ScrollFrame
+    toggleFrame.BackgroundColor3 = Color3.fromRGB(240, 240, 245)
+    toggleFrame.BackgroundTransparency = 0.2
+    toggleFrame.BorderSizePixel = 0
+    toggleFrame.Size = UDim2.new(0.95, 0, 0, 40)
+    toggleFrame.ZIndex = 6
+    Instance.new("UICorner", toggleFrame).CornerRadius = UDim.new(0, 8)
+    
+    local label = Instance.new("TextLabel")        
+    label.Parent = toggleFrame        
+    label.BackgroundTransparency = 1        
+    label.Position = UDim2.new(0.03, 0, 0, 0)        
+    label.Size = UDim2.new(0.7, 0, 1, 0)        
+    label.Font = Enum.Font.Gotham        
+    label.Text = nome        
+    label.TextColor3 = Color3.fromRGB(0, 0, 0)        
+    label.TextSize = 14        
+    label.TextXAlignment = Enum.TextXAlignment.Left        
+    label.ZIndex = 7
+    
+    local btn = Instance.new("TextButton")        
+    btn.Parent = toggleFrame        
+    btn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)        
+    btn.Position = UDim2.new(0.82, 0, 0.15, 0)        
+    btn.Size = UDim2.new(0, 45 * scaleMultiplier, 0, 22 * scaleMultiplier)      
+    btn.Font = Enum.Font.GothamBold        
+    btn.Text = "OFF"        
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)        
+    btn.TextSize = 11        
+    btn.ZIndex = 7
+    
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 10)
+    
+    -- Verificar estado salvo
+    local estadoSalvo = toggleStates[nome] or false
+    
+    if estadoSalvo then
+        btn.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+        btn.Text = "ON"
+        -- Ativar o sistema se estiver salvo como ativo
+        if callback then 
+            task.spawn(function()
+                callback(true)
+            end)
+        end
+    end
+    
+    btn.MouseButton1Click:Connect(function()
+        if not menuAtivo then return end
+        local ativado = not estadoSalvo
+        estadoSalvo = ativado
+        toggleStates[nome] = ativado
+        
+        btn.BackgroundColor3 = ativado and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(200, 60, 60)        
+        btn.Text = ativado and "ON" or "OFF"        
+        
+        if callback then callback(ativado) end        
+    end)        
+    
+    table.insert(opcoes, {frame = toggleFrame, nome = nome, aba = abaAtual, tipo = "toggle", elemento = btn})
+    
+    return btn
+end
+
+-- Função para criar slider
+local function criarSlider(nome, min, max, valorInicial, callback)
+    local sliderFrame = Instance.new("Frame")
+    sliderFrame.Parent = ScrollFrame
+    sliderFrame.BackgroundColor3 = Color3.fromRGB(240, 240, 245)
+    sliderFrame.BackgroundTransparency = 0.2
+    sliderFrame.BorderSizePixel = 0
+    sliderFrame.Size = UDim2.new(0.95, 0, 0, 70 * scaleMultiplier)
+    sliderFrame.ZIndex = 6
+    Instance.new("UICorner", sliderFrame).CornerRadius = UDim.new(0, 8)
+    
+    local label = Instance.new("TextLabel")        
+    label.Parent = sliderFrame        
+    label.BackgroundTransparency = 1        
+    label.Position = UDim2.new(0.03, 0, 0, 5)        
+    label.Size = UDim2.new(0.7, 0, 0, 20)        
+    label.Font = Enum.Font.Gotham        
+    label.Text = nome        
+    label.TextColor3 = Color3.fromRGB(0, 0, 0)        
+    label.TextSize = 14        
+    label.TextXAlignment = Enum.TextXAlignment.Left        
+    label.ZIndex = 7
+    
+    local valueLabel = Instance.new("TextLabel")        
+    valueLabel.Parent = sliderFrame        
+    valueLabel.BackgroundTransparency = 1        
+    valueLabel.Position = UDim2.new(0.75, 0, 0, 5)        
+    valueLabel.Size = UDim2.new(0.22, 0, 0, 20)        
+    valueLabel.Font = Enum.Font.GothamBold        
+    valueLabel.Text = tostring(valorInicial)        
+    valueLabel.TextColor3 = Color3.fromRGB(0, 100, 200)        
+    valueLabel.TextSize = 14        
+    valueLabel.TextXAlignment = Enum.TextXAlignment.Right        
+    valueLabel.ZIndex = 7
+    
+    local sliderBack = Instance.new("Frame")        
+    sliderBack.Parent = sliderFrame        
+    sliderBack.BackgroundColor3 = Color3.fromRGB(220, 220, 225)        
+    sliderBack.Position = UDim2.new(0.05, 0, 0.5, 0)        
+    sliderBack.Size = UDim2.new(0.9, 0, 0, 6)      
+    sliderBack.ZIndex = 7
+    Instance.new("UICorner", sliderBack).CornerRadius = UDim.new(1, 0)        
+    
+    local sliderFill = Instance.new("Frame")        
+    sliderFill.Parent = sliderBack        
+    sliderFill.BackgroundColor3 = Color3.fromRGB(0, 100, 200)        
+    sliderFill.Size = UDim2.new(0, 0, 1, 0)        
+    sliderFill.ZIndex = 7
+    Instance.new("UICorner", sliderFill).CornerRadius = UDim.new(1, 0)        
+    
+    local sliderButton = Instance.new("TextButton")        
+    sliderButton.Parent = sliderBack        
+    sliderButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)        
+    sliderButton.Position = UDim2.new(0, -6, 0.5, -6)      
+    sliderButton.Size = UDim2.new(0, 12 * scaleMultiplier, 0, 12 * scaleMultiplier)      
+    sliderButton.Text = ""        
+    sliderButton.ZIndex = 8
+    Instance.new("UICorner", sliderButton).CornerRadius = UDim.new(1, 0)        
+    
+    -- Configurar posição inicial
+    local relativePos = (valorInicial - min) / (max - min)
+    sliderFill.Size = UDim2.new(relativePos, 0, 1, 0)        
+    sliderButton.Position = UDim2.new(relativePos, -6, 0.5, -6)
+    
+    local dragging = false        
+    sliderButton.MouseButton1Down:Connect(function()
+        if not menuAtivo then return end
+        dragging = true        
+    end)        
+    
+    UserInputService.InputEnded:Connect(function(input)        
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then        
+            dragging = false        
+        end        
+    end)        
+    
+    UserInputService.InputChanged:Connect(function(input)        
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then        
+            local mousePos = UserInputService:GetMouseLocation().X        
+            local sliderPos = sliderBack.AbsolutePosition.X        
+            local sliderSize = sliderBack.AbsoluteSize.X        
+            local relativePos = math.clamp((mousePos - sliderPos) / sliderSize, 0, 1)        
+            local value = math.floor(min + (max - min) * relativePos)        
+            sliderFill.Size = UDim2.new(relativePos, 0, 1, 0)        
+            sliderButton.Position = UDim2.new(relativePos, -6, 0.5, -6)        
+            valueLabel.Text = tostring(value)        
+            if callback then callback(value) end        
+        end        
+    end)        
+    
+    table.insert(opcoes, {frame = sliderFrame, nome = nome, aba = abaAtual, tipo = "slider"})
+end
+
+-- Função para tornar arrastável
+local function tornarArrastavel(frame)
+    local dragging = false
+    local dragStart, startPos
+    
+    frame.InputBegan:Connect(function(input)  
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then  
+            dragging = true  
+            dragStart = input.Position  
+            startPos = mainContainer.Position  
+        end  
+    end)  
+    
+    frame.InputEnded:Connect(function(input)  
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then  
+            dragging = false  
+        end  
+    end)  
+    
+    UserInputService.InputChanged:Connect(function(input)  
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then  
+            local delta = input.Position - dragStart  
+            mainContainer.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)  
+        end  
+    end)
+end
+
+-- Aplicar arrastável
+tornarArrastavel(dragFrame)
+
+-- Função de animação
+local function animacaoMexer(frame)
+    if not menuAtivo then return end
+    local originalPosition = frame.Position
+    frame:TweenPosition(
+        originalPosition + UDim2.new(0, 2, 0, 2),
+        Enum.EasingDirection.Out,
+        Enum.EasingStyle.Quad,
+        0.05,
+        true,
+        function()
+            frame:TweenPosition(
+                originalPosition,
+                Enum.EasingDirection.Out,
+                Enum.EasingStyle.Back,
+                0.1,
+                true
+            )
+        end
+    )
+end
+
+-- Função para trocar de aba
+local function trocarAba(nomeAba)
+    if not menuAtivo then return end
+    abaAtual = nomeAba
+    nomeaba.Text = nomeAba
+    pesquisar.Text = ""
+
+    -- Limpar conteúdo anterior
+    for _, child in pairs(ScrollFrame:GetChildren()) do    
+        if child:IsA("Frame") then child:Destroy() end    
+    end    
+    
+    opcoes = {}        
+    
+    if nomeAba == "Inicio" then        
+        -- Conteúdo da aba Inicio
+        criarToggle("Fly PC (E)", function(ativado)
+            print("Fly PC: " .. (ativado and "Ativado" or "Desativado"))
+        end)
+        
+    elseif nomeAba == "Combate" then
+        -- Apenas os 3 toggles principais
+        criarToggle("Noclip Automático", function(ativado)
+            toggleNoclip(ativado)
+        end)
+        
+        criarToggle("Anti-Algemas", function(ativado)
+            toggleAntiAlgemas(ativado)
+        end)
+        
+    elseif nomeAba == "Aimbots" then
+        -- Aimbot na aba Aimbots
+        criarToggle("Aimbot (FOV)", function(ativado)
+            toggleAimbot(ativado)
+        end)
+        
+        -- Slider para FOV do Aimbot
+        criarSlider("FOV Aimbot", 50, 500, FOVRadius, function(valor)
+            FOVRadius = valor
+            if fovCircle then
+                fovCircle.Radius = FOVRadius
+            end
+            print("FOV ajustado para: " .. valor)
+        end)
+        
+    else
+        -- Para outras abas, manter apenas um toggle de exemplo
+        criarToggle("Exemplo " .. nomeAba, function(ativado)
+            print(nomeAba .. ": " .. (ativado and "Ativado" or "Desativado"))
+        end)
+    end    
+    
+    task.wait(0.1)    
+    ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, UIListLayout.AbsoluteContentSize.Y + 20)
+end
+
+-- Conectar botões de aba
+local botoesAba = {inicio, combate, esp, aimbots, revistar, teleporte, veiculo, farm, novaAba1, novaAba2}
+local nomesAba = {"Inicio", "Combate", "Esp's", "Aimbots", "+Revistar", "Teleportes", "Veículo", "Farm", "Configurações", "Extras"}
+
+for i, botao in ipairs(botoesAba) do
+    botao.MouseButton1Click:Connect(function()
+        if not menuAtivo then return end
+        animacaoMexer(botao)
+        trocarAba(nomesAba[i])
+    end)
+end
+
+-- Configurar layout
+abaLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    selecionaraba.CanvasSize = UDim2.new(0, 0, 0, abaLayout.AbsoluteContentSize.Y + 20)
+end)
+
+-- BOTÃO FECHAR
+fechar.MouseButton1Click:Connect(function()
+    animacaoMexer(fechar)
+    
+    -- Limpar sistemas antes de fechar
+    if aimbotConnection then
+        aimbotConnection:Disconnect()
+    end
+    if noclipConexao then
+        noclipConexao:Disconnect()
+    end
+    if antiAlgemasConnection then
+        antiAlgemasConnection:Disconnect()
+    end
+    if fovCircle then
+        fovCircle:Remove()
+    end
+    
+    -- Adicionar task.wait para evitar kick
+    task.wait(0.05)
+    
+    -- Fechar menu
+    menuAtivo = false
+    if screenGui then
+        screenGui:Destroy()
+    end
+end)
+
+-- BOTÃO MINIMIZAR
+posicaoOriginal = mainContainer.Position
+
+minimizar.MouseButton1Click:Connect(function()
+    if not menuAtivo then return end
+    animacaoMexer(minimizar)
+    estaMinimizado = not estaMinimizado
+
+    if estaMinimizado then    
+        posicaoOriginal = mainContainer.Position    
+        selecionaraba.Visible = false    
+        abaexemplo.Visible = false    
+        enfeite_2.Visible = false    
+        pesquisar.Visible = false    
+        lupa.Visible = false    
+        nomeaba.Visible = false    
+        coisasdaaba.Position = UDim2.new(0, 150 * scaleMultiplier, 0, 0)    
+        coisasdaaba.Size = UDim2.new(0, 100 * scaleMultiplier, 0, 80 * scaleMultiplier)    
+        minimizar.Position = UDim2.new(0.25, 0, 0.3, 0)    
+        minimizar.Size = UDim2.new(0, 30 * scaleMultiplier, 0, 30 * scaleMultiplier)    
+        minimizar.Text = "+"    
+        fechar.Position = UDim2.new(0.65, 0, 0.3, 0)    
+        fechar.Size = UDim2.new(0, 30 * scaleMultiplier, 0, 30 * scaleMultiplier)    
+        dragFrame.Size = UDim2.new(1, 0, 1, 0)    
+        
+        mainContainer:TweenPosition(    
+            UDim2.new(0.5, 0, 0.1, 0),    
+            Enum.EasingDirection.Out,    
+            Enum.EasingStyle.Quad,    
+            0.3,    
+            true,    
+            function()    
+                mainContainer:TweenSize(    
+                    UDim2.new(0, 250 * scaleMultiplier, 0, 80 * scaleMultiplier),    
+                    Enum.EasingDirection.Out,    
+                    Enum.EasingStyle.Back,    
+                    0.4,    
+                    true    
+                )    
+            end    
+        )    
+    else    
+        selecionaraba.Visible = true    
+        abaexemplo.Visible = true    
+        enfeite_2.Visible = true    
+        pesquisar.Visible = true    
+        lupa.Visible = true    
+        nomeaba.Visible = true    
+        coisasdaaba.Position = UDim2.new(0.2, 0, 0, 0)    
+        coisasdaaba.Size = UDim2.new(0, 600 * scaleMultiplier, 0, 60 * scaleMultiplier)    
+        minimizar.Position = UDim2.new(0.78, 0, 0.15, 0)    
+        minimizar.Size = UDim2.new(0, 30 * scaleMultiplier, 0, 30 * scaleMultiplier)    
+        minimizar.Text = "-"    
+        fechar.Position = UDim2.new(0.85, 0, 0.15, 0)    
+        fechar.Size = UDim2.new(0, 30 * scaleMultiplier, 0, 30 * scaleMultiplier)    
+        dragFrame.Size = UDim2.new(1, 0, 0, 60)    
+        
+        mainContainer:TweenSize(    
+            UDim2.new(0, 750 * scaleMultiplier, 0, 500 * scaleMultiplier),    
+            Enum.EasingDirection.Out,    
+            Enum.EasingStyle.Back,    
+            0.4,    
+            true,    
+            function()    
+                mainContainer:TweenPosition(    
+                    posicaoOriginal,    
+                    Enum.EasingDirection.Out,    
+                    Enum.EasingStyle.Quad,    
+                    0.3,    
+                    true    
+                )    
+            end    
+        )    
+    end
+end)
+
+-- Botão de logo para restaurar do minimizado
+iceimagem.MouseButton1Click:Connect(function()
+    if not menuAtivo then return end
+    if estaMinimizado then
+        animacaoMexer(iceimagem)
+        estaMinimizado = false
+        selecionaraba.Visible = true
+        abaexemplo.Visible = true
+        enfeite_2.Visible = true
+        pesquisar.Visible = true
+        lupa.Visible = true
+        nomeaba.Visible = true
+        coisasdaaba.Position = UDim2.new(0.2, 0, 0, 0)
+        coisasdaaba.Size = UDim2.new(0, 600 * scaleMultiplier, 0, 60 * scaleMultiplier)
+        minimizar.Position = UDim2.new(0.78, 0, 0.15, 0)
+        minimizar.Size = UDim2.new(0, 30 * scaleMultiplier, 0, 30 * scaleMultiplier)
+        minimizar.Text = "-"
+        fechar.Position = UDim2.new(0.85, 0, 0.15, 0)
+        fechar.Size = UDim2.new(0, 30 * scaleMultiplier, 0, 30 * scaleMultiplier)
+        dragFrame.Size = UDim2.new(1, 0, 0, 60)
+
+        mainContainer:TweenSize(  
+            UDim2.new(0, 750 * scaleMultiplier, 0, 500 * scaleMultiplier),  
+            Enum.EasingDirection.Out,  
+            Enum.EasingStyle.Back,  
+            0.4,  
+            true,  
+            function()  
+                mainContainer:TweenPosition(  
+                    posicaoOriginal,  
+                    Enum.EasingDirection.Out,  
+                    Enum.EasingStyle.Quad,  
+                    0.3,  
+                    true  
+                )  
+            end  
+        )  
+    end
+end)
+
+-- Tecla F9 para mostrar/ocultar
+UserInputService.InputBegan:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.F9 then
+        if menuAtivo then
+            guiVisivel = not guiVisivel
+            mainContainer.Visible = guiVisivel
+        end
+    end
+end)
+
+-- Inicialização
+UIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, UIListLayout.AbsoluteContentSize.Y + 20)
+end)
+
+-- Iniciar na aba Inicio
+wait(0.5)
+if menuAtivo then
+    trocarAba("Inicio")
+end

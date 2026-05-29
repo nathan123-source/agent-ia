@@ -1,0 +1,2495 @@
+-- TELA DE CARREGAMENTO ICE MENU
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+local isMobile = UserInputService.TouchEnabled
+
+-- ConfiguraÃ§Ãµes de tamanho para mobile/desktop
+local logoSize = isMobile and 100 or 150
+local logoPosOffset = isMobile and -50 or -75
+local placeholderTextSize = isMobile and 50 or 80
+local titleSizeW = isMobile and 300 or 500
+local titleSizeH = isMobile and 60 or 100
+local titlePosXoff = isMobile and -150 or -250
+local titlePosYoff = isMobile and -30 or -50
+local titleTextSize = isMobile and 50 or 80
+local versionSizeW = isMobile and 120 or 200
+local versionSizeH = isMobile and 30 or 50
+local versionPosOff = isMobile and -60 or -100
+local versionTextSize = isMobile and 25 or 40
+local barSizeW = isMobile and 240 or 400
+local barSizeH = isMobile and 5 or 8
+local barPosOff = isMobile and -120 or -200
+local loadingTextSizeW = isMobile and 240 or 400
+local loadingTextSizeH = isMobile and 20 or 30
+local loadingTextPosOff = isMobile and -120 or -200
+local loadingTextSize = isMobile and 12 or 18
+local creditsSizeW = isMobile and 180 or 300
+local creditsSizeH = isMobile and 15 or 25
+local creditsPosOff = isMobile and -90 or -150
+local creditsTextSize = isMobile and 10 or 14
+local particleMinSize = isMobile and 1 or 2
+local particleMaxSize = isMobile and 4 or 6
+local floatYMin = isMobile and 10 or 20
+local floatYMax = isMobile and 30 or 50
+
+-- Criar a interface de carregamento
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "carregamento"
+screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.Parent = playerGui
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(1, 0, 1, 0)
+mainFrame.Position = UDim2.new(0, 0, 0, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(15, 25, 35)
+mainFrame.BorderSizePixel = 0
+mainFrame.Parent = screenGui
+
+local gradient = Instance.new("UIGradient")
+gradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(10, 30, 50)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(20, 50, 80)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(10, 30, 50))
+}
+gradient.Rotation = 45
+gradient.Parent = mainFrame
+
+-- Logo
+local logoImage = Instance.new("ImageLabel")
+logoImage.Size = UDim2.new(0, logoSize, 0, logoSize)
+logoImage.Position = UDim2.new(0.5, logoPosOffset, 0.18, 0)
+logoImage.BackgroundTransparency = 0
+logoImage.BackgroundColor3 = Color3.fromRGB(100, 180, 255)
+logoImage.ZIndex = 5
+logoImage.Parent = mainFrame
+
+local cornerLogo = Instance.new("UICorner")
+cornerLogo.CornerRadius = UDim.new(0.2, 0)
+cornerLogo.Parent = logoImage
+
+local placeholderText = Instance.new("TextLabel")
+placeholderText.Size = UDim2.new(1, 0, 1, 0)
+placeholderText.BackgroundTransparency = 1
+placeholderText.Text = "🧊"
+placeholderText.Font = Enum.Font.GothamBold
+placeholderText.TextSize = placeholderTextSize
+placeholderText.TextColor3 = Color3.fromRGB(255, 255, 255)
+placeholderText.Parent = logoImage
+
+-- PartÃ­culas de fundo
+for i = 1, 30 do
+    local particle = Instance.new("Frame")
+    particle.Size = UDim2.new(0, math.random(particleMinSize, particleMaxSize), 0, math.random(particleMinSize, particleMaxSize))
+    particle.Position = UDim2.new(math.random(0, 100) / 100, 0, math.random(0, 100) / 100, 0)
+    particle.BackgroundColor3 = Color3.fromRGB(150, 200, 255)
+    particle.BackgroundTransparency = math.random(30, 70) / 100
+    particle.BorderSizePixel = 0
+    particle.Parent = mainFrame
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(1, 0)
+    corner.Parent = particle
+    
+    spawn(function()
+        while particle.Parent do
+            local floatTween = TweenService:Create(
+                particle,
+                TweenInfo.new(math.random(3, 6), Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+                {Position = particle.Position + UDim2.new(0, 0, math.random(-50, 50) / 1000, math.random(floatYMin, floatYMax))}
+            )
+            floatTween:Play()
+            wait(math.random(3, 6))
+        end
+    end)
+end
+
+-- TÃ­tulo
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(0, titleSizeW, 0, titleSizeH)
+titleLabel.Position = UDim2.new(0.5, titlePosXoff, 0.4, titlePosYoff)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "ICE MENU"
+titleLabel.Font = Enum.Font.GothamBold
+titleLabel.TextSize = titleTextSize
+titleLabel.TextColor3 = Color3.fromRGB(200, 230, 255)
+titleLabel.TextTransparency = 1
+titleLabel.TextStrokeTransparency = 0.5
+titleLabel.TextStrokeColor3 = Color3.fromRGB(100, 180, 255)
+titleLabel.ZIndex = 2
+titleLabel.Parent = mainFrame
+
+-- VersÃ£o
+local versionLabel = Instance.new("TextLabel")
+versionLabel.Size = UDim2.new(0, versionSizeW, 0, versionSizeH)
+versionLabel.Position = UDim2.new(0.5, versionPosOff, 0.55, 0)
+versionLabel.BackgroundTransparency = 1
+versionLabel.Text = "V3"
+versionLabel.Font = Enum.Font.GothamBold
+versionLabel.TextSize = versionTextSize
+versionLabel.TextColor3 = Color3.fromRGB(100, 200, 255)
+versionLabel.TextTransparency = 1
+versionLabel.ZIndex = 2
+versionLabel.Parent = mainFrame
+
+-- Barra de carregamento
+local loadingBarBg = Instance.new("Frame")
+loadingBarBg.Size = UDim2.new(0, barSizeW, 0, barSizeH)
+loadingBarBg.Position = UDim2.new(0.5, barPosOff, 0.7, 0)
+loadingBarBg.BackgroundColor3 = Color3.fromRGB(20, 40, 60)
+loadingBarBg.BorderSizePixel = 0
+loadingBarBg.ZIndex = 2
+loadingBarBg.Parent = mainFrame
+
+local barCorner = Instance.new("UICorner")
+barCorner.CornerRadius = UDim.new(1, 0)
+barCorner.Parent = loadingBarBg
+
+local loadingBar = Instance.new("Frame")
+loadingBar.Size = UDim2.new(0, 0, 1, 0)
+loadingBar.Position = UDim2.new(0, 0, 0, 0)
+loadingBar.BackgroundColor3 = Color3.fromRGB(100, 200, 255)
+loadingBar.BorderSizePixel = 0
+loadingBar.ZIndex = 3
+loadingBar.Parent = loadingBarBg
+
+local fillCorner = Instance.new("UICorner")
+fillCorner.CornerRadius = UDim.new(1, 0)
+fillCorner.Parent = loadingBar
+
+local barGradient = Instance.new("UIGradient")
+barGradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(100, 200, 255)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(150, 220, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(100, 200, 255))
+}
+barGradient.Parent = loadingBar
+
+-- Texto de carregamento
+local loadingText = Instance.new("TextLabel")
+loadingText.Size = UDim2.new(0, loadingTextSizeW, 0, loadingTextSizeH)
+loadingText.Position = UDim2.new(0.5, loadingTextPosOff, 0.75, 0)
+loadingText.BackgroundTransparency = 1
+loadingText.Text = "Carregando... 0%"
+loadingText.Font = Enum.Font.Gotham
+loadingText.TextSize = loadingTextSize
+loadingText.TextColor3 = Color3.fromRGB(150, 200, 255)
+loadingText.ZIndex = 2
+loadingText.Parent = mainFrame
+
+-- CrÃ©ditos
+local creditsText = Instance.new("TextLabel")
+creditsText.Size = UDim2.new(0, creditsSizeW, 0, creditsSizeH)
+creditsText.Position = UDim2.new(0.5, creditsPosOff, 0.9, 0)
+creditsText.BackgroundTransparency = 1
+creditsText.Text = "by: edu and seila"
+creditsText.Font = Enum.Font.Gotham
+creditsText.TextSize = creditsTextSize
+creditsText.TextColor3 = Color3.fromRGB(120, 170, 220)
+creditsText.TextTransparency = 0.3
+creditsText.ZIndex = 2
+creditsText.Parent = mainFrame
+
+-- Som
+local sound = Instance.new("Sound")
+sound.SoundId = "rbxassetid://101404943278256"
+sound.Volume = 0.5
+sound.Parent = screenGui
+
+-- FunÃ§Ã£o para carregar o menu principal
+local function carregarMenuPrincipal()
+    -- Carregar biblioteca Discord
+    local success, DiscordLib = pcall(function()
+        return loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/UI-Libs/main/discord%20lib.txt"))()
+    end)
+    
+    if not success then
+        warn("âŒ Erro ao carregar Discord Library")
+        return
+    end
+
+    -- ServiÃ§os
+    local Players = game:GetService("Players")
+    local Player = Players.LocalPlayer
+    local UIS = game:GetService("UserInputService")
+    local RunService = game:GetService("RunService")
+    local TweenService = game:GetService("TweenService")
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    local HttpService = game:GetService("HttpService")
+
+    -- CORREÃ‡ÃƒO AQUI: Fechando corretamente os parÃªnteses
+    local mercadinmote_upvr = ReplicatedStorage:WaitForChild("RemoteNovos"):WaitForChild("mercadinmote")
+    local bixobrabo_remote = ReplicatedStorage:WaitForChild("RemoteNovos"):WaitForChild("bixobrabo")
+
+    -- VariÃ¡veis globais
+    local menuAtivo = true
+    local isMobile = UIS.TouchEnabled
+
+    -- VariÃ¡veis de sistemas
+    local autoFarmPecasAtivo = false
+    local autoFarmGasAtivo = false
+    local autoFarmMineracao = false
+    local aimbotAtivo = false
+    local protecaoVidaAtiva = false
+    local autoCL = false
+    local antiQuedaAtivo = false
+    local revistarAtivo = false
+    local teleportAtivo = false
+    local jogarCarroLongeAtivo = false
+    local espAtivo = false
+    local flyVeiculoAtivo = false
+
+    -- VariÃ¡veis de hitbox
+    local hitboxAtivado = false
+    local hitboxSize = Vector3.new(5, 5, 5)
+
+    -- VariÃ¡veis de nitro
+    local forcaNitro = 50
+    local nitroConnection = nil
+    local nitroAtivado = false
+
+    -- VariÃ¡veis para sistemas
+    local flyAtivado = false
+    local flyMobileAtivado = false
+    local wallCheckAtivado = false
+    local flying = false
+    local noclipConexao = nil
+    local antiQuedaCon = nil
+
+    -- VariÃ¡veis para sistemas diversos
+    local LockPickAtivado = false
+    local PuxarArmaSafe = false
+    local autoFarmMineracaoCoroutine = nil
+    local jogarCarroLongeCoroutine = nil
+    local autoRevistarCoroutine = nil
+    local flyVeiculoCoroutine = nil
+
+    -- ConfiguraÃ§Ãµes do Aimbot
+    local aimbotConfig = {
+        TeamCheck = true,
+        WallCheck = false,
+        KillCheck = true,
+        FOV = 50,
+        Suavidade = 20,
+        Enabled = false
+    }
+
+-- ðŸŽ¯ SISTEMA ESP BOX SIMPLES (COM TOGGLE)
+local espAtivo = false
+local espConnections = {}
+local espStorage = nil
+
+local function criarESPStorage()
+    if not espStorage then
+        espStorage = Instance.new("Folder")
+        espStorage.Parent = game:GetService("CoreGui")
+        espStorage.Name = "Highlight_Storage"
+    end
+    return espStorage
+end
+
+local function limparESP()
+    if espStorage then
+        espStorage:Destroy()
+        espStorage = nil
+    end
+    
+    for player, connection in pairs(espConnections) do
+        if connection then
+            connection:Disconnect()
+        end
+    end
+    espConnections = {}
+end
+
+local function aplicarHighlight(plr)
+    if not espAtivo or not plr then return end
+    
+    local Highlight = Instance.new("Highlight")
+    Highlight.Name = plr.Name
+    Highlight.FillColor = Color3.fromRGB(175, 25, 255)
+    Highlight.DepthMode = "AlwaysOnTop"
+    Highlight.FillTransparency = 0.5
+    Highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    Highlight.OutlineTransparency = 0
+    Highlight.Parent = criarESPStorage()
+    
+    local plrchar = plr.Character
+    if plrchar then
+        Highlight.Adornee = plrchar
+    end
+
+    espConnections[plr] = plr.CharacterAdded:Connect(function(char)
+        if espAtivo and Highlight then
+            Highlight.Adornee = char
+        end
+    end)
+end
+
+local function iniciarESPHighlight()
+    if espAtivo then return end
+    
+    espAtivo = true
+    limparESP() -- Limpa qualquer ESP anterior
+    
+    local Players = game:GetService("Players")
+    
+    -- Aplicar para jogadores existentes
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= Players.LocalPlayer then
+            aplicarHighlight(player)
+        end
+    end
+    
+    -- Conectar para novos jogadores
+    espConnections.playerAdded = Players.PlayerAdded:Connect(function(player)
+        aplicarHighlight(player)
+    end)
+    
+    -- Limpar quando jogador sair
+    espConnections.playerRemoving = Players.PlayerRemoving:Connect(function(plr)
+        if espStorage and espStorage:FindFirstChild(plr.Name) then
+            espStorage[plr.Name]:Destroy()
+        end
+        if espConnections[plr] then
+            espConnections[plr]:Disconnect()
+            espConnections[plr] = nil
+        end
+    end)
+    
+    notificar("ESP", "ESP Highlight ativado!", 3)
+end
+
+local function pararESPHighlight()
+    if not espAtivo then return end
+    
+    espAtivo = false
+    limparESP()
+    notificar("ESP", "ESP Highlight desativado!", 3)
+end
+
+local function toggleESP(ativado)
+    if ativado then
+        iniciarESPHighlight()
+    else
+        pararESPHighlight()
+    end
+end
+    -- ======================
+    -- ðŸŽ¯ SISTEMA AIMBOT AVANÃ‡ADO
+    -- ======================
+    local function getTargetPartFromCharacter(char, partName)
+        if not char then return nil end
+        local candidate
+        if partName == "Head" then
+            candidate = char:FindFirstChild("Head") or char:FindFirstChild("head")
+        else
+            candidate = char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso") or char:FindFirstChild("LowerTorso") or char:FindFirstChild("HumanoidRootPart")
+        end
+        return candidate
+    end
+
+    local function getClosestTarget()
+        local closestPlayer, closestPart, closestDistance = nil, nil, math.huge
+        local cam = workspace.CurrentCamera
+        if not cam then return nil end
+        
+        local center = Vector2.new(cam.ViewportSize.X/2, cam.ViewportSize.Y/2)
+        
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= Player and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
+                -- Team check
+                if aimbotConfig.TeamCheck and player.Team == Player.Team then
+                    continue
+                end
+                
+                local part = getTargetPartFromCharacter(player.Character, "Head")
+                if part and part.Parent then
+                    local worldPos = part.Position
+                    local screenPos, onScreen = cam:WorldToViewportPoint(worldPos)
+                    local screenX, screenY, depth = screenPos.X, screenPos.Y, screenPos.Z
+                    
+                    if depth > 0 then
+                        -- Wall check
+                        if aimbotConfig.WallCheck then
+                            local raycastParams = RaycastParams.new()
+                            raycastParams.FilterDescendantsInstances = {Player.Character}
+                            raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+                            raycastParams.IgnoreWater = true
+                            
+                            local raycastResult = workspace:Raycast(cam.CFrame.Position, (worldPos - cam.CFrame.Position), raycastParams)
+                            if raycastResult and raycastResult.Instance and not raycastResult.Instance:IsDescendantOf(player.Character) then
+                                continue
+                            end
+                        end
+                        
+                        local distance = (Vector2.new(screenX, screenY) - center).Magnitude
+                        if distance < closestDistance and distance <= aimbotConfig.FOV then
+                            closestDistance = distance
+                            closestPlayer = player
+                            closestPart = part
+                        end
+                    end
+                end
+            end
+        end
+        
+        return closestPlayer, closestPart
+    end
+
+    local function iniciarAimbot()
+        if not menuAtivo then return end
+        
+        local cam = workspace.CurrentCamera
+        local lastTick = tick()
+        
+        RunService:BindToRenderStep("AimbotStep", Enum.RenderPriority.Camera.Value + 1, function()
+            if not aimbotConfig.Enabled then return end
+            
+            local currentTime = tick()
+            local deltaTime = math.clamp(currentTime - lastTick, 0, 0.1)
+            lastTick = currentTime
+            
+            local player, part = getClosestTarget()
+            if player and part and part.Parent then
+                local targetPosition = part.Position
+                local currentCFrame = cam.CFrame
+                local desiredCFrame = CFrame.new(currentCFrame.Position, targetPosition)
+                local alpha = math.clamp(1 - math.exp(-aimbotConfig.Suavidade * deltaTime), 0, 1)
+                cam.CFrame = currentCFrame:Lerp(desiredCFrame, alpha)
+            end
+        end)
+        
+        notificar("Aimbot", "Aimbot ativado atravÃ©s do Discord!", 3)
+    end
+
+    local function toggleAimbot(ativado)
+        aimbotConfig.Enabled = ativado
+        aimbotAtivo = ativado
+        
+        if ativado then
+            iniciarAimbot()
+            notificar("Aimbot", "Aimbot ativado!", 2)
+        else
+            -- Desconectar o RenderStep quando desativado
+            for _, connection in pairs(getconnections(RunService.RenderStepped)) do
+                if connection.Function and debug.info(connection.Function, "n") == "AimbotStep" then
+                    connection:Disable()
+                end
+            end
+            notificar("Aimbot", "Aimbot desativado!", 2)
+        end
+    end
+
+   -- ======================
+-- ðŸ” SISTEMA AUTO REVISTAR ATUALIZADO (COM TOGGLE)
+-- ======================
+local autoRevistarAtivo = false
+local autoRevistarThread = nil
+
+local function toggleAutoRevistar(ativado)
+    autoRevistarAtivo = ativado
+    
+    if ativado then
+        -- Carregar e executar o novo sistema
+        local success, result = pcall(function()
+            return loadstring(game:HttpGet("https://gist.githubusercontent.com/emailressevahenrique-pixel/857b3fd36adeaaac1fa7f3f9b7f66336/raw/9870066764c62f7909601fc6227b37e28f5bfa0a/gistfile1.txt"))()
+        end)
+        
+        if success then
+            notificar("Auto Revistar", "âœ… Novo sistema ativado!", 3)
+            
+            -- Criar thread para monitorar o estado
+            autoRevistarThread = task.spawn(function()
+                while autoRevistarAtivo do
+                    task.wait(1)
+                    -- Aqui vocÃª pode adicionar lÃ³gica para controlar o sistema
+                end
+            end)
+        else
+            notificar("âŒ Erro", "Falha ao carregar auto revistar: " .. tostring(result), 3)
+            autoRevistarAtivo = false
+        end
+    else
+        -- Desativar o sistema
+        if autoRevistarThread then
+            task.cancel(autoRevistarThread)
+            autoRevistarThread = nil
+        end
+        
+        -- Tentar desativar a GUI do novo sistema
+        local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+        for _, gui in ipairs(playerGui:GetChildren()) do
+            if gui:IsA("ScreenGui") and (gui.Name:find("Revista") or gui.Name:find("AutoRevista")) then
+                gui:Destroy()
+            end
+        end
+        
+        notificar("Auto Revistar", "âŒ Sistema desativado!", 3)
+    end
+end
+
+-- FunÃ§Ã£o para limpar quando o script for fechado
+local function limparAutoRevistar()
+    if autoRevistarThread then
+        task.cancel(autoRevistarThread)
+        autoRevistarThread = nil
+    end
+    autoRevistarAtivo = false
+end
+
+    -- ======================
+    -- ðŸš— SISTEMA FLY VEÃCULO
+    -- ======================
+    local function toggleFlyVeiculo(ativado)
+        flyVeiculoAtivo = ativado
+        
+        if ativado then
+            if flyVeiculoCoroutine then
+                coroutine.close(flyVeiculoCoroutine)
+            end
+            
+            flyVeiculoCoroutine = coroutine.create(function()
+                local RunService = game:GetService("RunService")
+                local Players = game:GetService("Players")
+                local UserInputService = game:GetService("UserInputService")
+                local TweenService = game:GetService("TweenService")
+
+                local LocalPlayer = Players.LocalPlayer
+                local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+                local Humanoid = Character:WaitForChild("Humanoid")
+
+                -- VariÃ¡veis
+                local flyEnabled = false
+                local currentVehicle, bodyGyro, bodyVelocity
+                local flySpeed = 50
+                local moveDirection = Vector3.zero
+                local moveY = 0
+
+                -- FunÃ§Ã£o pra detectar veÃ­culo
+                local function getVehicle()
+                    if Character and Character:FindFirstChildOfClass("Humanoid") then
+                        local seat = Character.Humanoid.SeatPart
+                        if seat and seat:IsA("VehicleSeat") then
+                            return seat.Parent
+                        end
+                    end
+                    return nil
+                end
+
+                -- Liga/desliga o fly
+                local function toggleFly(state)
+                    flyEnabled = state
+                    currentVehicle = getVehicle()
+
+                    if flyEnabled and currentVehicle then
+                        local root = currentVehicle:FindFirstChild("PrimaryPart") or currentVehicle:FindFirstChildWhichIsA("BasePart")
+                        if not root then 
+                            flyEnabled = false
+                            return 
+                        end
+
+                        -- Remove antigos se existirem
+                        if bodyGyro then bodyGyro:Destroy() end
+                        if bodyVelocity then bodyVelocity:Destroy() end
+
+                        bodyGyro = Instance.new("BodyGyro")
+                        bodyGyro.D = 500
+                        bodyGyro.P = 10000
+                        bodyGyro.MaxTorque = Vector3.new(40000, 40000, 40000)
+                        bodyGyro.CFrame = root.CFrame
+                        bodyGyro.Parent = root
+
+                        bodyVelocity = Instance.new("BodyVelocity")
+                        bodyVelocity.MaxForce = Vector3.new(40000, 40000, 40000)
+                        bodyVelocity.Velocity = Vector3.zero
+                        bodyVelocity.Parent = root
+                        
+                        print("Fly ON - VeÃ­culo: " .. currentVehicle.Name)
+                    else
+                        if bodyGyro then 
+                            bodyGyro:Destroy() 
+                            bodyGyro = nil 
+                        end
+                        if bodyVelocity then 
+                            bodyVelocity:Destroy() 
+                            bodyVelocity = nil 
+                        end
+                        moveDirection = Vector3.zero
+                        moveY = 0
+                        print("Fly OFF")
+                    end
+                end
+
+                -- Atualiza movimento
+                RunService.Heartbeat:Connect(function()
+                    if flyEnabled and currentVehicle and bodyGyro and bodyVelocity then
+                        local root = currentVehicle:FindFirstChild("PrimaryPart") or currentVehicle:FindFirstChildWhichIsA("BasePart")
+                        if not root then return end
+
+                        -- Pega a direÃ§Ã£o do movimento do Humanoid (touch control)
+                        local move = Humanoid.MoveDirection
+                        local horizontalMove = Vector3.new(move.X, 0, move.Z)
+                        
+                        -- Combina movimento horizontal com vertical
+                        local finalMove = horizontalMove + Vector3.new(0, moveY, 0)
+                        
+                        if finalMove.Magnitude > 0 then
+                            -- Converte para espaÃ§o mundial relativo Ã  rotaÃ§Ã£o do veÃ­culo
+                            local worldMove = root.CFrame:VectorToWorldSpace(finalMove)
+                            bodyVelocity.Velocity = worldMove * flySpeed
+                        else
+                            bodyVelocity.Velocity = Vector3.zero
+                        end
+                        
+                        -- MantÃ©m a rotaÃ§Ã£o atual
+                        bodyGyro.CFrame = root.CFrame
+                    end
+                end)
+
+                -- GUI do Fly VeÃ­culo
+                local ScreenGui = Instance.new("ScreenGui")
+                ScreenGui.Name = "FlyCarSystem"
+                ScreenGui.ResetOnSpawn = false
+                ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+                ScreenGui.Parent = game.CoreGui
+
+                local MainToggle = Instance.new("TextButton")
+                MainToggle.Size = UDim2.new(0, 120, 0, 45)
+                MainToggle.Position = UDim2.new(0.05, 0, 0.7, 0)
+                MainToggle.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+                MainToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+                MainToggle.TextScaled = true
+                MainToggle.Text = "ðŸª¶ GUI: ON"
+                MainToggle.Font = Enum.Font.GothamBold
+                MainToggle.ZIndex = 2
+                MainToggle.Parent = ScreenGui
+
+                Instance.new("UICorner", MainToggle)
+
+                local Frame = Instance.new("Frame")
+                Frame.Size = UDim2.new(0, 250, 0, 320)
+                Frame.Position = UDim2.new(0.65, 0, 0.4, 0)
+                Frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+                Frame.BackgroundTransparency = 0.1
+                Frame.Active = true
+                Frame.Draggable = true
+                Frame.Visible = true
+                Frame.ZIndex = 2
+                Frame.Parent = ScreenGui
+
+                local FrameCorner = Instance.new("UICorner", Frame)
+                FrameCorner.CornerRadius = UDim.new(0, 12)
+
+                local Title = Instance.new("TextLabel")
+                Title.Size = UDim2.new(1, 0, 0, 40)
+                Title.Position = UDim2.new(0, 0, 0, 5)
+                Title.BackgroundTransparency = 1
+                Title.Text = "ðŸš— FlyCar Control"
+                Title.TextColor3 = Color3.fromRGB(0, 170, 255)
+                Title.Font = Enum.Font.GothamBold
+                Title.TextSize = 18
+                Title.ZIndex = 3
+                Title.Parent = Frame
+
+                local FlyBtn = Instance.new("TextButton")
+                FlyBtn.Size = UDim2.new(0.9, 0, 0, 50)
+                FlyBtn.Position = UDim2.new(0.05, 0, 0.15, 0)
+                FlyBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+                FlyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+                FlyBtn.Text = "ðŸš€ FLY: OFF"
+                FlyBtn.TextSize = 16
+                FlyBtn.Font = Enum.Font.GothamBold
+                FlyBtn.ZIndex = 3
+                FlyBtn.Parent = Frame
+
+                local FlyBtnCorner = Instance.new("UICorner", FlyBtn)
+                FlyBtnCorner.CornerRadius = UDim.new(0, 8)
+
+                local UpBtn = Instance.new("TextButton")
+                UpBtn.Size = UDim2.new(0.42, 0, 0, 50)
+                UpBtn.Position = UDim2.new(0.05, 0, 0.35, 0)
+                UpBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+                UpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+                UpBtn.Text = "â¬†ï¸ SUBIR"
+                UpBtn.TextSize = 14
+                UpBtn.Font = Enum.Font.GothamBold
+                UpBtn.ZIndex = 3
+                UpBtn.Parent = Frame
+
+                local UpBtnCorner = Instance.new("UICorner", UpBtn)
+                UpBtnCorner.CornerRadius = UDim.new(0, 8)
+
+                local DownBtn = Instance.new("TextButton")
+                DownBtn.Size = UDim2.new(0.42, 0, 0, 50)
+                DownBtn.Position = UDim2.new(0.53, 0, 0.35, 0)
+                DownBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+                DownBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+                DownBtn.Text = "â¬‡ï¸ DESCER"
+                DownBtn.TextSize = 14
+                DownBtn.Font = Enum.Font.GothamBold
+                DownBtn.ZIndex = 3
+                DownBtn.Parent = Frame
+
+                local DownBtnCorner = Instance.new("UICorner", DownBtn)
+                DownBtnCorner.CornerRadius = UDim.new(0, 8)
+
+                local SpeedLabel = Instance.new("TextLabel")
+                SpeedLabel.Size = UDim2.new(1, 0, 0, 40)
+                SpeedLabel.Position = UDim2.new(0, 0, 0.55, 0)
+                SpeedLabel.BackgroundTransparency = 1
+                SpeedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+                SpeedLabel.Text = "Velocidade: " .. flySpeed
+                SpeedLabel.Font = Enum.Font.GothamBold
+                SpeedLabel.TextSize = 16
+                SpeedLabel.ZIndex = 3
+                SpeedLabel.Parent = Frame
+
+                local PlusBtn = Instance.new("TextButton")
+                PlusBtn.Size = UDim2.new(0.42, 0, 0, 45)
+                PlusBtn.Position = UDim2.new(0.05, 0, 0.72, 0)
+                PlusBtn.BackgroundColor3 = Color3.fromRGB(40, 120, 40)
+                PlusBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+                PlusBtn.Text = "âž• +12"
+                PlusBtn.TextSize = 14
+                PlusBtn.Font = Enum.Font.GothamBold
+                PlusBtn.ZIndex = 3
+                PlusBtn.Parent = Frame
+
+                local PlusBtnCorner = Instance.new("UICorner", PlusBtn)
+                PlusBtnCorner.CornerRadius = UDim.new(0, 8)
+
+                local MinusBtn = Instance.new("TextButton")
+                MinusBtn.Size = UDim2.new(0.42, 0, 0, 45)
+                MinusBtn.Position = UDim2.new(0.53, 0, 0.72, 0)
+                MinusBtn.BackgroundColor3 = Color3.fromRGB(120, 40, 40)
+                MinusBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+                MinusBtn.Text = "âž– -12"
+                MinusBtn.TextSize = 14
+                MinusBtn.Font = Enum.Font.GothamBold
+                MinusBtn.ZIndex = 3
+                MinusBtn.Parent = Frame
+
+                local MinusBtnCorner = Instance.new("UICorner", MinusBtn)
+                MinusBtnCorner.CornerRadius = UDim.new(0, 8)
+
+                local StatusLabel = Instance.new("TextLabel")
+                StatusLabel.Size = UDim2.new(1, 0, 0, 30)
+                StatusLabel.Position = UDim2.new(0, 0, 0.9, 0)
+                StatusLabel.BackgroundTransparency = 1
+                StatusLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+                StatusLabel.Text = "Entre em um veÃ­culo"
+                StatusLabel.Font = Enum.Font.Gotham
+                StatusLabel.TextSize = 12
+                StatusLabel.ZIndex = 3
+                StatusLabel.Parent = Frame
+
+                -- Eventos dos botÃµes
+                MainToggle.MouseButton1Click:Connect(function()
+                    local uiVisible = Frame.Visible
+                    uiVisible = not uiVisible
+                    Frame.Visible = uiVisible
+                    MainToggle.Text = uiVisible and "ðŸª¶ GUI: ON" or "ðŸª¶ GUI: OFF"
+                end)
+
+                FlyBtn.MouseButton1Click:Connect(function()
+                    if not getVehicle() then
+                        StatusLabel.Text = "ERRO: Entre em um veÃ­culo primeiro!"
+                        task.wait(2)
+                        StatusLabel.Text = "Entre em um veÃ­culo"
+                        return
+                    end
+                    
+                    toggleFly(not flyEnabled)
+                    
+                    if flyEnabled then
+                        FlyBtn.Text = "ðŸš€ FLY: ON"
+                        FlyBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+                        StatusLabel.Text = "Fly ATIVADO"
+                    else
+                        FlyBtn.Text = "ðŸš€ FLY: OFF"
+                        FlyBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+                        StatusLabel.Text = "Fly DESATIVADO"
+                    end
+                end)
+
+                UpBtn.MouseButton1Down:Connect(function()
+                    moveY = 1
+                end)
+
+                UpBtn.MouseButton1Up:Connect(function()
+                    moveY = 0
+                end)
+
+                DownBtn.MouseButton1Down:Connect(function()
+                    moveY = -1
+                end)
+
+                DownBtn.MouseButton1Up:Connect(function()
+                    moveY = 0
+                end)
+
+                PlusBtn.MouseButton1Click:Connect(function()
+                    flySpeed = math.clamp(flySpeed + 12, 12, 500)
+                    SpeedLabel.Text = "Velocidade: " .. flySpeed
+                    StatusLabel.Text = "Velocidade: " .. flySpeed
+                end)
+
+                MinusBtn.MouseButton1Click:Connect(function()
+                    flySpeed = math.clamp(flySpeed - 12, 12, 500)
+                    SpeedLabel.Text = "Velocidade: " .. flySpeed
+                    StatusLabel.Text = "Velocidade: " .. flySpeed
+                end)
+
+                -- Atualiza status do veÃ­culo
+                RunService.Heartbeat:Connect(function()
+                    local vehicle = getVehicle()
+                    if vehicle then
+                        StatusLabel.Text = "VeÃ­culo: " .. vehicle.Name
+                        if not flyEnabled then
+                            FlyBtn.BackgroundColor3 = Color3.fromRGB(200, 150, 50)
+                            FlyBtn.Text = "ðŸš€ FLY: PRONTO"
+                        end
+                    else
+                        if flyEnabled then
+                            toggleFly(false)
+                            FlyBtn.Text = "ðŸš€ FLY: OFF"
+                            FlyBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+                        end
+                        StatusLabel.Text = "Entre em um veÃ­culo"
+                    end
+                end)
+
+                notificar("Fly VeÃ­culo", "Sistema Fly VeÃ­culo carregado!", 3)
+            end)
+            
+            coroutine.resume(flyVeiculoCoroutine)
+        else
+            if flyVeiculoCoroutine then
+                coroutine.close(flyVeiculoCoroutine)
+                flyVeiculoCoroutine = nil
+            end
+            notificar("Fly VeÃ­culo", "Sistema desativado!", 2)
+        end
+    end
+
+    -- ======================
+    -- ðŸ›’ SISTEMA DE MERCADO
+    -- ======================
+    local ItensMercado = {
+        {Nome = "Hamburguer", Preco = 30, ImageID = "11514960069"},
+        {Nome = "Agua", Preco = 10, ImageID = "16089085133"},
+        {Nome = "iPhone 14", Preco = 600, ImageID = "11523731697"},
+        {Nome = "Lanterna", Preco = 150, ImageID = "93861980305421"},
+        {Nome = "Gasolina", Preco = 1000, ImageID = "16390555026"},
+    }
+
+    local function comprarItem(itemNome, preco)
+        local MercadinhoRemote = ReplicatedStorage:WaitForChild("RemoteNovos"):WaitForChild("mercadinmote")
+        
+        local args = {
+            [1] = itemNome,
+            [2] = preco,
+            [3] = Player
+        }
+        
+        local success, result = pcall(function()
+            return MercadinhoRemote:FireServer("mercadinhow", args)
+        end)
+        
+        if success then
+            DiscordLib:Notification("ðŸ›’ Mercado", "âœ… VocÃª comprou: " .. itemNome, "OK")
+        else
+            DiscordLib:Notification("âŒ Erro", "Falha ao comprar: " .. itemNome .. "\nErro: " .. tostring(result), "OK")
+        end
+    end
+
+    local function notificar(titulo, texto, duracao)
+        if DiscordLib then
+            DiscordLib:Notification(titulo, texto, "OK")
+        else
+            print("ðŸ”” " .. titulo .. ": " .. texto)
+        end
+    end
+
+    -- ======================
+    -- ðŸ§¹ SISTEMA DE LIMPEZA
+    -- ======================
+    local function limparTodosProcessos()
+        menuAtivo = false
+        
+        -- Desativar todos os sistemas
+        autoFarmPecasAtivo = false
+        autoFarmGasAtivo = false
+        aimbotAtivo = false
+        protecaoVidaAtiva = false
+        autoCL = false
+        antiQuedaAtivo = false
+        revistarAtivo = false
+        teleportAtivo = false
+        nitroAtivado = false
+        flyAtivado = false
+        flyMobileAtivado = false
+        wallCheckAtivado = false
+        hitboxAtivado = false
+        LockPickAtivado = false
+        PuxarArmaSafe = false
+        jogarCarroLongeAtivo = false
+        espAtivo = false
+        flyVeiculoAtivo = false
+        
+        -- Desativar Aimbot
+        toggleAimbot(false)
+        
+        -- Desativar Auto Revistar
+        toggleAutoRevistar(false)
+        
+        -- Desativar Fly VeÃ­culo
+        toggleFlyVeiculo(false)
+        
+        -- Desconectar conexÃµes
+        if antiQuedaCon then
+            antiQuedaCon:Disconnect()
+            antiQuedaCon = nil
+        end
+        
+        if noclipConexao then
+            noclipConexao:Disconnect()
+            noclipConexao = nil
+        end
+        
+        if nitroConnection then
+            if isMobile then
+                if nitroConnection:IsA("TextButton") then
+                    nitroConnection:Destroy()
+                end
+            else
+                nitroConnection:Disconnect()
+            end
+            nitroConnection = nil
+        end
+        
+        -- Parar coroutines
+        if autoFarmMineracaoCoroutine then
+            coroutine.close(autoFarmMineracaoCoroutine)
+            autoFarmMineracaoCoroutine = nil
+        end
+        
+        if jogarCarroLongeCoroutine then
+            coroutine.close(jogarCarroLongeCoroutine)
+            jogarCarroLongeCoroutine = nil
+        end
+        
+        if autoRevistarCoroutine then
+            coroutine.close(autoRevistarCoroutine)
+            autoRevistarCoroutine = nil
+        end
+        
+        if flyVeiculoCoroutine then
+            coroutine.close(flyVeiculoCoroutine)
+            flyVeiculoCoroutine = nil
+        end
+        
+        -- Restaurar colisÃ£o do personagem
+        if Player.Character then
+            for _, part in ipairs(Player.Character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = true
+                end
+            end
+        end
+        
+        -- Restaurar cÃ¢mera
+        workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
+        local char = Player.Character
+        if char then
+            workspace.CurrentCamera.CameraSubject = char:FindFirstChildOfClass("Humanoid")
+        end
+    end
+
+    -- ======================
+    -- âš”ï¸ SISTEMA DE HITBOX
+    -- ======================
+    local function aplicarHitbox()
+        if not menuAtivo then return end
+        for _, plr in pairs(Players:GetPlayers()) do
+            if plr ~= Player and plr.Character then
+                local char = plr.Character
+                local hrp = char:FindFirstChild("HumanoidRootPart")
+
+                if hrp then
+                    if hitboxAtivado then
+                        hrp.Size = hitboxSize
+                        hrp.Transparency = 0.7
+                        hrp.Material = Enum.Material.Neon
+                        hrp.Color = Color3.fromRGB(255, 0, 0)
+                        hrp.CanCollide = false
+                    else
+                        hrp.Size = Vector3.new(2, 2, 1)
+                        hrp.Transparency = 1
+                        hrp.Material = Enum.Material.Plastic
+                        hrp.Color = Color3.fromRGB(255, 255, 255)
+                        hrp.CanCollide = true
+                    end
+                end
+            end
+        end
+    end
+
+    local function toggleHitbox(ativado)
+        if not menuAtivo then return end
+        hitboxAtivado = ativado
+        aplicarHitbox()
+        notificar("Hitbox", hitboxAtivado and "Hitbox ativado!" or "Hitbox desativado!", 2)
+    end
+
+    -- ======================
+    -- ðŸš€ SISTEMA FLY COMPLETO (COM GUI)
+    -- ======================
+    local function iniciarFlyCompleto()
+        local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
+local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+gui.Name = "flyporra"
+gui.ResetOnSpawn = false
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.fromOffset(300, 120)
+frame.Position = UDim2.new(0, 100, 0, 100)
+frame.BackgroundColor3 = Color3.fromRGB(32,32,44)
+frame.Active = true
+frame.Draggable = true
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 12)
+local toggleBtn = Instance.new("TextButton", frame)
+toggleBtn.Size = UDim2.fromOffset(160,40)
+toggleBtn.Position = UDim2.new(0,70,0,38)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(50,90,162)
+toggleBtn.Text = "Ativar FLY"
+toggleBtn.Font = Enum.Font.GothamMedium
+toggleBtn.TextSize = 20
+toggleBtn.TextColor3 = Color3.fromRGB(255,255,255)
+Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0,8)
+local sliderBar = Instance.new("Frame", frame)
+sliderBar.Size = UDim2.new(0,160,0,10)
+sliderBar.Position = UDim2.new(0,70,0,84)
+sliderBar.BackgroundColor3 = Color3.fromRGB(155,175,255)
+Instance.new("UICorner", sliderBar).CornerRadius = UDim.new(0,5)
+local knob = Instance.new("ImageButton", frame)
+knob.Size = UDim2.fromOffset(18,18)
+knob.Position = UDim2.new(0,70,0,80)
+knob.Image = "rbxassetid://3570695787"
+knob.BackgroundTransparency = 1
+knob.ImageColor3 = Color3.fromRGB(255,255,255)
+local speedLabel = Instance.new("TextLabel", frame)
+speedLabel.Size = UDim2.new(0,60,0,18)
+speedLabel.Position = UDim2.new(0,232,0,77)
+speedLabel.BackgroundTransparency = 1
+speedLabel.Font = Enum.Font.Gotham
+speedLabel.TextColor3 = Color3.fromRGB(255,255,255)
+speedLabel.TextSize = 15
+local flying = false
+local flySpeed = 25
+local minSpeed, maxSpeed = 1, 400
+local move = {f=0,b=0,l=0,r=0,u=0,d=0}
+local inputConns = {}
+local flyLoop, dieConn
+local function setSpeedUI(val)
+    flySpeed = math.clamp(val, minSpeed, maxSpeed)
+    local relX = (flySpeed-minSpeed)/(maxSpeed-minSpeed)
+    local len = math.max(sliderBar.AbsoluteSize.X - knob.AbsoluteSize.X, 1)
+    local x = math.floor(relX * len)
+    knob.Position = UDim2.new(0, 70 + x, 0, 80)
+    speedLabel.Text = ("Vel:%d"):format(flySpeed)
+end
+local dragging = false
+knob.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+end)
+RunService.RenderStepped:Connect(function()
+    if dragging then
+        local mx = UserInputService:GetMouseLocation().X
+        local abs = sliderBar.AbsolutePosition.X
+        local len = math.max(sliderBar.AbsoluteSize.X - knob.AbsoluteSize.X, 1)
+        local rel = math.clamp(mx - abs, 0, len)
+        knob.Position = UDim2.new(0,70+rel,0,80)
+        local percent = rel / len
+        setSpeedUI( math.floor(minSpeed + percent*(maxSpeed-minSpeed)) )
+    end
+end)
+setSpeedUI(flySpeed)
+local function clearInputConns()
+    for _,c in pairs(inputConns) do
+        if c and c.Disconnect then pcall(c.Disconnect, c) end
+    end
+    inputConns = {}
+end
+local function stopFly()
+    flying = false
+    toggleBtn.Text = "Ativar FLY"
+    if flyLoop then pcall(function() flyLoop:Disconnect() end) end
+    if dieConn then pcall(function() dieConn:Disconnect() end) end
+    clearInputConns()
+    local char = player.Character
+    if char and char:FindFirstChild("HumanoidRootPart") then
+        local root = char.HumanoidRootPart
+        for _,obj in pairs(root:GetChildren()) do
+            if obj:IsA("BodyVelocity") or obj:IsA("BodyGyro") or obj:IsA("AlignVelocity") then
+                pcall(function() obj:Destroy() end)
+            end
+        end
+        pcall(function() root.AssemblyLinearVelocity = Vector3.new() end)
+    end
+end
+local function startFly()
+    stopFly()
+    flying = true
+    toggleBtn.Text = "Desativar FLY"
+    local char = player.Character or player.CharacterAdded:Wait()
+    local root = char:WaitForChild("HumanoidRootPart", 5)
+    local hum = char:FindFirstChildWhichIsA("Humanoid")
+    if not root or not hum then return stopFly() end
+    inputConns.keyDown = UserInputService.InputBegan:Connect(function(input, g)
+        if g then return end
+        if input.KeyCode == Enum.KeyCode.W then move.f = 1 end
+        if input.KeyCode == Enum.KeyCode.S then move.b = 1 end
+        if input.KeyCode == Enum.KeyCode.A then move.l = 1 end
+        if input.KeyCode == Enum.KeyCode.D then move.r = 1 end
+        if input.KeyCode == Enum.KeyCode.Space then move.u = 1 end
+        if input.KeyCode == Enum.KeyCode.LeftControl then move.d = 1 end
+    end)
+    inputConns.keyUp = UserInputService.InputEnded:Connect(function(input, g)
+        if g then return end
+        if input.KeyCode == Enum.KeyCode.W then move.f = 0 end
+        if input.KeyCode == Enum.KeyCode.S then move.b = 0 end
+        if input.KeyCode == Enum.KeyCode.A then move.l = 0 end
+        if input.KeyCode == Enum.KeyCode.D then move.r = 0 end
+        if input.KeyCode == Enum.KeyCode.Space then move.u = 0 end
+        if input.KeyCode == Enum.KeyCode.LeftControl then move.d = 0 end
+    end)
+    flyLoop = RunService.RenderStepped:Connect(function()
+        if not flying or not root or not hum or hum.Health <= 0 then return end
+        local cam = workspace.CurrentCamera
+        local dirLocal = Vector3.new(move.r - move.l, move.u - move.d, move.b - move.f)
+        if dirLocal.Magnitude > 0 then
+            root.AssemblyLinearVelocity = cam.CFrame:VectorToWorldSpace(dirLocal.Unit * flySpeed)
+        else
+            root.AssemblyLinearVelocity = Vector3.new()
+        end
+    end)
+    dieConn = hum.Died:Connect(function()
+        stopFly()
+    end)
+end
+toggleBtn.MouseButton1Click:Connect(function()
+    if flying then stopFly() else startFly() end
+end)
+player.CharacterAdded:Connect(function()
+    if flying then
+        wait(0.8)
+        startFly()
+    end
+end)
+        notificar("Fly GUI", "Interface Fly carregada! Use os botÃµes para controlar.", 3)
+    end
+
+    -- ======================
+    -- ðŸš€ FLY PC MODERNO (COM SLIDER)
+    -- ======================
+    local function iniciarFlyPCModerno()
+        local main = Instance.new("ScreenGui")
+local Frame = Instance.new("Frame")
+local up = Instance.new("TextButton")
+local down = Instance.new("TextButton")
+local onof = Instance.new("TextButton")
+local TextLabel = Instance.new("TextLabel")
+local plus = Instance.new("TextButton")
+local speed = Instance.new("TextLabel")
+local mine = Instance.new("TextButton")
+local closebutton = Instance.new("TextButton")
+local mini = Instance.new("TextButton")
+local mini2 = Instance.new("TextButton")
+main.Name = "main"
+main.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+main.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+main.ResetOnSpawn = false
+Frame.Parent = main
+Frame.BackgroundColor3 = Color3.fromRGB(163, 255, 137)
+Frame.BorderColor3 = Color3.fromRGB(103, 221, 213)
+Frame.Position = UDim2.new(0.100320168, 0, 0.379746825, 0)
+Frame.Size = UDim2.new(0, 190, 0, 57)
+up.Name = "up"
+up.Parent = Frame
+up.BackgroundColor3 = Color3.fromRGB(79, 255, 152)
+up.Size = UDim2.new(0, 44, 0, 28)
+up.Font = Enum.Font.SourceSans
+up.Text = "UP"
+up.TextColor3 = Color3.fromRGB(0, 0, 0)
+up.TextSize = 14.000
+down.Name = "down"
+down.Parent = Frame
+down.BackgroundColor3 = Color3.fromRGB(215, 255, 121)
+down.Position = UDim2.new(0, 0, 0.491228074, 0)
+down.Size = UDim2.new(0, 44, 0, 28)
+down.Font = Enum.Font.SourceSans
+down.Text = "DOWN"
+down.TextColor3 = Color3.fromRGB(0, 0, 0)
+down.TextSize = 14.000
+onof.Name = "onof"
+onof.Parent = Frame
+onof.BackgroundColor3 = Color3.fromRGB(255, 249, 74)
+onof.Position = UDim2.new(0.702823281, 0, 0.491228074, 0)
+onof.Size = UDim2.new(0, 56, 0, 28)
+onof.Font = Enum.Font.SourceSans
+onof.Text = "fly"
+onof.TextColor3 = Color3.fromRGB(0, 0, 0)
+onof.TextSize = 14.000
+TextLabel.Parent = Frame
+TextLabel.BackgroundColor3 = Color3.fromRGB(242, 60, 255)
+TextLabel.Position = UDim2.new(0.469327301, 0, 0, 0)
+TextLabel.Size = UDim2.new(0, 100, 0, 28)
+TextLabel.Font = Enum.Font.SourceSans
+TextLabel.Text = "FLY BY EDU"
+TextLabel.TextColor3 = Color3.fromRGB(0, 0, 0)
+TextLabel.TextScaled = true
+TextLabel.TextSize = 14.000
+TextLabel.TextWrapped = true
+plus.Name = "plus"
+plus.Parent = Frame
+plus.BackgroundColor3 = Color3.fromRGB(133, 145, 255)
+plus.Position = UDim2.new(0.231578946, 0, 0, 0)
+plus.Size = UDim2.new(0, 45, 0, 28)
+plus.Font = Enum.Font.SourceSans
+plus.Text = "+"
+plus.TextColor3 = Color3.fromRGB(0, 0, 0)
+plus.TextScaled = true
+plus.TextSize = 14.000
+plus.TextWrapped = true
+speed.Name = "speed"
+speed.Parent = Frame
+speed.BackgroundColor3 = Color3.fromRGB(255, 85, 0)
+speed.Position = UDim2.new(0.468421042, 0, 0.491228074, 0)
+speed.Size = UDim2.new(0, 44, 0, 28)
+speed.Font = Enum.Font.SourceSans
+speed.Text = "1"
+speed.TextColor3 = Color3.fromRGB(0, 0, 0)
+speed.TextScaled = true
+speed.TextSize = 14.000
+speed.TextWrapped = true
+mine.Name = "mine"
+mine.Parent = Frame
+mine.BackgroundColor3 = Color3.fromRGB(123, 255, 247)
+mine.Position = UDim2.new(0.231578946, 0, 0.491228074, 0)
+mine.Size = UDim2.new(0, 45, 0, 29)
+mine.Font = Enum.Font.SourceSans
+mine.Text = "-"
+mine.TextColor3 = Color3.fromRGB(0, 0, 0)
+mine.TextScaled = true
+mine.TextSize = 14.000
+mine.TextWrapped = true
+closebutton.Name = "Close"
+closebutton.Parent = main.Frame
+closebutton.BackgroundColor3 = Color3.fromRGB(225, 25, 0)
+closebutton.Font = "SourceSans"
+closebutton.Size = UDim2.new(0, 45, 0, 28)
+closebutton.Text = "X"
+closebutton.TextSize = 30
+closebutton.Position = UDim2.new(0, 0, -1, 27)
+mini.Name = "minimize"
+mini.Parent = main.Frame
+mini.BackgroundColor3 = Color3.fromRGB(192, 150, 230)
+mini.Font = "SourceSans"
+mini.Size = UDim2.new(0, 45, 0, 28)
+mini.Text = "-"
+mini.TextSize = 40
+mini.Position = UDim2.new(0, 44, -1, 27)
+mini2.Name = "minimize2"
+mini2.Parent = main.Frame
+mini2.BackgroundColor3 = Color3.fromRGB(192, 150, 230)
+mini2.Font = "SourceSans"
+mini2.Size = UDim2.new(0, 45, 0, 28)
+mini2.Text = "+"
+mini2.TextSize = 40
+mini2.Position = UDim2.new(0, 44, -1, 57)
+mini2.Visible = false
+speeds = 1
+local speaker = game:GetService("Players").LocalPlayer
+local chr = speaker.Character
+local hum = chr and chr:FindFirstChildWhichIsA("Humanoid")
+local nowe = false
+game:GetService("StarterGui"):SetCore("SendNotification", {
+Title = "FLY GUI",
+Text = "FEITO POR ADMZIN",
+Icon = "rbxthumb://type=Asset&id=5107182114&w=150&h=150",
+Duration = 5
+})
+Frame.Active = true
+Frame.Draggable = true
+onof.MouseButton1Down:Connect(function()
+if nowe then
+nowe = false
+speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Climbing, true)
+speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, true)
+speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Flying, true)
+speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Freefall, true)
+speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.GettingUp, true)
+speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
+speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Landed, true)
+speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Physics, true)
+speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.PlatformStanding, true)
+speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, true)
+speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Running, true)
+speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.RunningNoPhysics, true)
+speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, true)
+speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.StrafingNoPhysics, true)
+speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Swimming, true)
+speaker.Character.Humanoid:ChangeState(Enum.HumanoidStateType.RunningNoPhysics)
+else
+nowe = true
+for i = 1, speeds do
+spawn(function()
+local hb = game:GetService("RunService").Heartbeat
+tpwalking = true
+local chr = game.Players.LocalPlayer.Character
+local hum = chr and chr:FindFirstChildWhichIsA("Humanoid")
+while tpwalking and hb:Wait() and chr and hum and hum.Parent do
+if hum.MoveDirection.Magnitude > 0 then
+chr:TranslateBy(hum.MoveDirection)
+end
+end
+end)
+end
+game.Players.LocalPlayer.Character.Animate.Disabled = false
+local Char = game.Players.LocalPlayer.Character
+local Hum = Char:FindFirstChildOfClass("Humanoid") or Char:FindFirstChildOfClass("AnimationController")
+for i, v in next, Hum:GetPlayingAnimationTracks() do
+v:AdjustSpeed(0)
+end
+speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Climbing, false)
+speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
+speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Flying, false)
+speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Freefall, false)
+speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.GettingUp, false)
+speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
+speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Landed, false)
+speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Physics, false)
+speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.PlatformStanding, false)
+speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
+speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Running, false)
+speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.RunningNoPhysics, false)
+speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
+speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.StrafingNoPhysics, false)
+speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Swimming, false)
+speaker.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Swimming)
+end
+if game:GetService("Players").LocalPlayer.Character:FindFirstChildOfClass("Humanoid").RigType == Enum.HumanoidRigType.R6 then
+local plr = game.Players.LocalPlayer
+local torso = plr.Character.Torso
+local flying = true
+local deb = true
+local ctrl = {f = 0, b = 0, l = 0, r = 0}
+local lastctrl = {f = 0, b = 0, l = 0, r = 0}
+local maxspeed = 50
+local speed = 0
+local bg = Instance.new("BodyGyro", torso)
+bg.P = 9e4
+bg.maxTorque = Vector3.new(9e9, 9e9, 9e9)
+bg.cframe = torso.CFrame
+local bv = Instance.new("BodyVelocity", torso)
+bv.velocity = Vector3.new(0, 0.1, 0)
+bv.maxForce = Vector3.new(9e9, 9e9, 9e9)
+if nowe then
+plr.Character.Humanoid.PlatformStand = true
+end
+while nowe and game:GetService("Players").LocalPlayer.Character.Humanoid.Health > 0 do
+game:GetService("RunService").RenderStepped:Wait()
+if ctrl.l + ctrl.r ~= 0 or ctrl.f + ctrl.b ~= 0 then
+speed = speed + 0.5 + (speed / maxspeed)
+if speed > maxspeed then
+speed = maxspeed
+end
+elseif not (ctrl.l + ctrl.r ~= 0 or ctrl.f + ctrl.b ~= 0) and speed ~= 0 then
+speed = speed - 1
+if speed < 0 then
+speed = 0
+end
+end
+if (ctrl.l + ctrl.r) ~= 0 or (ctrl.f + ctrl.b) ~= 0 then
+bv.velocity = ((game.Workspace.CurrentCamera.CoordinateFrame.lookVector * (ctrl.f + ctrl.b)) + ((game.Workspace.CurrentCamera.CoordinateFrame * CFrame.new(ctrl.l + ctrl.r, (ctrl.f + ctrl.b) * 0.2, 0).p) - game.Workspace.CurrentCamera.CoordinateFrame.p)) * speed
+lastctrl = {f = ctrl.f, b = ctrl.b, l = ctrl.l, r = ctrl.r}
+elseif (ctrl.l + ctrl.r) == 0 and (ctrl.f + ctrl.b) == 0 and speed ~= 0 then
+bv.velocity = ((game.Workspace.CurrentCamera.CoordinateFrame.lookVector * (lastctrl.f + lastctrl.b)) + ((game.Workspace.CurrentCamera.CoordinateFrame * CFrame.new(lastctrl.l + lastctrl.r, (lastctrl.f + lastctrl.b) * 0.2, 0).p) - game.Workspace.CurrentCamera.CoordinateFrame.p)) * speed
+else
+bv.velocity = Vector3.new(0, 0, 0)
+end
+bg.cframe = game.Workspace.CurrentCamera.CoordinateFrame * CFrame.Angles(-math.rad((ctrl.f + ctrl.b) * 50 * speed / maxspeed), 0, 0)
+end
+ctrl = {f = 0, b = 0, l = 0, r = 0}
+lastctrl = {f = 0, b = 0, l = 0, r = 0}
+speed = 0
+bg:Destroy()
+bv:Destroy()
+plr.Character.Humanoid.PlatformStand = false
+game.Players.LocalPlayer.Character.Animate.Disabled = false
+tpwalking = false
+else
+local plr = game.Players.LocalPlayer
+local UpperTorso = plr.Character.UpperTorso
+local flying = true
+local deb = true
+local ctrl = {f = 0, b = 0, l = 0, r = 0}
+local lastctrl = {f = 0, b = 0, l = 0, r = 0}
+local maxspeed = 50
+local speed = 0
+local bg = Instance.new("BodyGyro", UpperTorso)
+bg.P = 9e4
+bg.maxTorque = Vector3.new(9e9, 9e9, 9e9)
+bg.cframe = UpperTorso.CFrame
+local bv = Instance.new("BodyVelocity", UpperTorso)
+bv.velocity = Vector3.new(0, 0.1, 0)
+bv.maxForce = Vector3.new(9e9, 9e9, 9e9)
+if nowe then
+plr.Character.Humanoid.PlatformStand = true
+end
+while nowe and game:GetService("Players").LocalPlayer.Character.Humanoid.Health > 0 do
+wait()
+if ctrl.l + ctrl.r ~= 0 or ctrl.f + ctrl.b ~= 0 then
+speed = speed + 0.5 + (speed / maxspeed)
+if speed > maxspeed then
+speed = maxspeed
+end
+elseif not (ctrl.l + ctrl.r ~= 0 or ctrl.f + ctrl.b ~= 0) and speed ~= 0 then
+speed = speed - 1
+if speed < 0 then
+speed = 0
+end
+end
+if (ctrl.l + ctrl.r) ~= 0 or (ctrl.f + ctrl.b) ~= 0 then
+bv.velocity = ((game.Workspace.CurrentCamera.CoordinateFrame.lookVector * (ctrl.f + ctrl.b)) + ((game.Workspace.CurrentCamera.CoordinateFrame * CFrame.new(ctrl.l + ctrl.r, (ctrl.f + ctrl.b) * 0.2, 0).p) - game.Workspace.CurrentCamera.CoordinateFrame.p)) * speed
+lastctrl = {f = ctrl.f, b = ctrl.b, l = ctrl.l, r = ctrl.r}
+elseif (ctrl.l + ctrl.r) == 0 and (ctrl.f + ctrl.b) == 0 and speed ~= 0 then
+bv.velocity = ((game.Workspace.CurrentCamera.CoordinateFrame.lookVector * (lastctrl.f + lastctrl.b)) + ((game.Workspace.CurrentCamera.CoordinateFrame * CFrame.new(lastctrl.l + lastctrl.r, (lastctrl.f + lastctrl.b) * 0.2, 0).p) - game.Workspace.CurrentCamera.CoordinateFrame.p)) * speed
+else
+bv.velocity = Vector3.new(0, 0, 0)
+end
+bg.cframe = game.Workspace.CurrentCamera.CoordinateFrame * CFrame.Angles(-math.rad((ctrl.f + ctrl.b) * 50 * speed / maxspeed), 0, 0)
+end
+ctrl = {f = 0, b = 0, l = 0, r = 0}
+lastctrl = {f = 0, b = 0, l = 0, r = 0}
+speed = 0
+bg:Destroy()
+bv:Destroy()
+plr.Character.Humanoid.PlatformStand = false
+game.Players.LocalPlayer.Character.Animate.Disabled = false
+tpwalking = false
+end
+end)
+local tis
+up.MouseButton1Down:Connect(function()
+tis = up.MouseEnter:Connect(function()
+while tis do
+wait()
+game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame * CFrame.new(0, 1, 0)
+end
+end)
+end)
+up.MouseLeave:Connect(function()
+if tis then
+tis:Disconnect()
+tis = nil
+end
+end)
+local dis
+down.MouseButton1Down:Connect(function()
+dis = down.MouseEnter:Connect(function()
+while dis do
+wait()
+game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame * CFrame.new(0, -1, 0)
+end
+end)
+end)
+down.MouseLeave:Connect(function()
+if dis then
+dis:Disconnect()
+dis = nil
+end
+end)
+game:GetService("Players").LocalPlayer.CharacterAdded:Connect(function(char)
+wait(0.7)
+game.Players.LocalPlayer.Character.Humanoid.PlatformStand = false
+game.Players.LocalPlayer.Character.Animate.Disabled = false
+end)
+plus.MouseButton1Down:Connect(function()
+speeds = speeds + 1
+speed.Text = speeds
+if nowe then
+tpwalking = false
+for i = 1, speeds do
+spawn(function()
+local hb = game:GetService("RunService").Heartbeat
+tpwalking = true
+local chr = game.Players.LocalPlayer.Character
+local hum = chr and chr:FindFirstChildWhichIsA("Humanoid")
+while tpwalking and hb:Wait() and chr and hum and hum.Parent do
+if hum.MoveDirection.Magnitude > 0 then
+chr:TranslateBy(hum.MoveDirection)
+end
+end
+end)
+end
+end
+end)
+mine.MouseButton1Down:Connect(function()
+if speeds == 1 then
+speed.Text = 'cannot be less than 1'
+wait(1)
+speed.Text = speeds
+else
+speeds = speeds - 1
+speed.Text = speeds
+if nowe then
+tpwalking = false
+for i = 1, speeds do
+spawn(function()
+local hb = game:GetService("RunService").Heartbeat
+tpwalking = true
+local chr = game.Players.LocalPlayer.Character
+local hum = chr and chr:FindFirstChildWhichIsA("Humanoid")
+while tpwalking and hb:Wait() and chr and hum and hum.Parent do
+if hum.MoveDirection.Magnitude > 0 then
+chr:TranslateBy(hum.MoveDirection)
+end
+end
+end)
+end
+end
+end
+end)
+closebutton.MouseButton1Click:Connect(function()
+main:Destroy()
+end)
+mini.MouseButton1Click:Connect(function()
+up.Visible = false
+down.Visible = false
+onof.Visible = false
+plus.Visible = false
+speed.Visible = false
+mine.Visible = false
+mini.Visible = false
+mini2.Visible = true
+main.Frame.BackgroundTransparency = 1
+closebutton.Position = UDim2.new(0, 0, -1, 57)
+end)
+mini2.MouseButton1Click:Connect(function()
+up.Visible = true
+down.Visible = true
+onof.Visible = true
+plus.Visible = true
+speed.Visible = true
+mine.Visible = true
+mini.Visible = true
+mini2.Visible = false
+main.Frame.BackgroundTransparency = 0
+closebutton.Position = UDim2.new(0, 0, -1, 27)
+end)
+        notificar("Fly PC Moderno", "Interface carregada! Use WASD + EspaÃ§o/Shift", 3)
+    end
+
+    -- ======================
+    -- ðŸ”§ SISTEMA DE NOCLIP
+    -- ======================
+    local function setCollisions(collide)
+        if Player.Character then
+            for _, part in ipairs(Player.Character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = collide
+                end
+            end
+        end
+    end
+
+    local function ativarNoclip()
+        if not menuAtivo then return end
+        if noclipConexao then return end
+        noclipConexao = RunService.RenderStepped:Connect(function()
+            setCollisions(false)
+        end)
+        notificar("Noclip", "Noclip ativado!", 3)
+    end
+
+    local function desativarNoclip()
+        if noclipConexao then
+            noclipConexao:Disconnect()
+            noclipConexao = nil
+            setCollisions(true)
+        end
+        notificar("Noclip", "Noclip desativado!", 3)
+    end
+
+    -- ======================
+    -- ðŸš— SISTEMA DE NITRO (MOBILE E PC)
+    -- ======================
+    local function getCurrentVehicleSeat()
+        local character = Players.LocalPlayer.Character
+        if not character or not character:FindFirstChild("Humanoid") then
+            return nil
+        end
+        
+        local humanoid = character.Humanoid
+        if humanoid.SeatPart and humanoid.SeatPart:IsA("VehicleSeat") then
+            return humanoid.SeatPart
+        end
+        return nil
+    end
+
+    local function ativarNitro()
+        if not menuAtivo then return end
+        local seat = getCurrentVehicleSeat()
+        if not seat then
+            notificar("Nitro", "Entre em um veÃ­culo primeiro!", 3)
+            return
+        end
+        
+        local success = pcall(function()
+            local bodyVel = Instance.new("BodyVelocity")
+            bodyVel.MaxForce = Vector3.new(math.huge, 0, math.huge)
+            bodyVel.Velocity = seat.CFrame.LookVector * forcaNitro
+            bodyVel.Parent = seat
+            
+            game:GetService("Debris"):AddItem(bodyVel, 0.3)
+        end)
+        
+        if success then
+            notificar("Nitro", "Nitro ativado!", 2)
+        else
+            notificar("Nitro", "Erro ao ativar nitro!", 2)
+        end
+    end
+
+    local function toggleNitroAutomatico(ativado)
+        if not menuAtivo then return end
+        nitroAtivado = ativado
+        
+        if nitroAtivado then
+            if nitroConnection then
+                nitroConnection:Disconnect()
+            end
+            
+            if isMobile then
+                local nitroButton = Instance.new("TextButton")
+                nitroButton.Name = "NitroButtonMobile"
+                nitroButton.Parent = Player.PlayerGui
+                nitroButton.Size = UDim2.new(0, 80, 0, 80)
+                nitroButton.Position = UDim2.new(1, -100, 1, -100)
+                nitroButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+                nitroButton.Text = "NITRO"
+                nitroButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+                nitroButton.TextSize = 16
+                nitroButton.ZIndex = 1000
+                
+                local corner = Instance.new("UICorner")
+                corner.CornerRadius = UDim.new(0, 20)
+                corner.Parent = nitroButton
+                
+                nitroButton.MouseButton1Click:Connect(function()
+                    ativarNitro()
+                end)
+                
+                nitroConnection = nitroButton
+            else
+                nitroConnection = UIS.InputBegan:Connect(function(input, gameProcessed)
+                    if gameProcessed then return end
+                    
+                    if input.KeyCode == Enum.KeyCode.N then
+                        ativarNitro()
+                    end
+                end)
+            end
+            
+            notificar("Nitro", "Nitro automÃ¡tico ativado!", 3)
+        else
+            if nitroConnection then
+                if isMobile then
+                    if nitroConnection:IsA("TextButton") then
+                        nitroConnection:Destroy()
+                    end
+                else
+                    nitroConnection:Disconnect()
+                end
+                nitroConnection = nil
+            end
+            notificar("Nitro", "Nitro automÃ¡tico desativado!", 3)
+        end
+    end
+
+    -- ======================
+    -- ðŸƒ SISTEMA DE FARM GARI
+    -- ======================
+    local function iniciarFarmGari()
+       -- â™»ï¸ Auto Gari - Coleta de Lixos (executa sozinho)
+-- Corrigido e pronto para injetar
+
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+local camera = workspace.CurrentCamera
+
+-- ðŸ”¹ FunÃ§Ã£o para obter o personagem e o HumanoidRootPart
+local function getCharacter()
+	local character = player.Character or player.CharacterAdded:Wait()
+	local root = character:WaitForChild("HumanoidRootPart")
+	return character, root
+end
+
+local character, humanoideRootPart = getCharacter()
+
+-- ðŸ”¹ Remove colisÃµes do personagem (impede de travar)
+local function removerColisao()
+	for _, part in ipairs(character:GetDescendants()) do
+		if part:IsA("BasePart") then
+			part.CanCollide = false
+		end
+	end
+end
+
+removerColisao()
+character.DescendantAdded:Connect(function(part)
+	if part:IsA("BasePart") then
+		part.CanCollide = false
+	end
+end)
+
+-- ðŸ”¹ Pega a pasta onde ficam os lixos
+local pastaLixos = workspace:WaitForChild("MapaGeral"):WaitForChild("Gari"):WaitForChild("Lixos")
+
+-- ðŸ”¹ Detecta os lixos disponÃ­veis (ativos)
+local function getLixosDisponiveis()
+	local ativos = {}
+	for _, obj in ipairs(pastaLixos:GetDescendants()) do
+		if obj:IsA("BasePart") and obj.Name == "LEXOS" and obj.Transparency == 0 then
+			local prompt = obj:FindFirstChildWhichIsA("ProximityPrompt", true)
+			if prompt then
+				prompt.MaxActivationDistance = 50
+				prompt.HoldDuration = 1.3
+				table.insert(ativos, {base = obj, prompt = prompt})
+			end
+		end
+	end
+	return ativos
+end
+
+-- ðŸ”¹ Ativa o prompt de cada lixo (teleporta, ajusta cÃ¢mera e coleta)
+local function ativarPromptComCamera(base, prompt)
+	local _, humanoideRootPart = getCharacter()
+	local posicao = base.Position + Vector3.new(0, 3, 0)
+	humanoideRootPart.CFrame = CFrame.new(posicao, base.Position)
+
+	camera.CameraType = Enum.CameraType.Scriptable
+	camera.CFrame = CFrame.new(camera.CFrame.Position, base.Position)
+
+	task.wait(0.4)
+
+	local sucesso = pcall(function()
+		fireproximityprompt(prompt, true)
+	end)
+
+	task.wait(prompt.HoldDuration + 0.3)
+
+	camera.CameraType = Enum.CameraType.Custom
+	return sucesso
+end
+
+-- ðŸ”¹ Loop automÃ¡tico
+task.spawn(function()
+	while task.wait(1) do
+		local lixos = getLixosDisponiveis()
+
+		for _, info in ipairs(lixos) do
+			local base = info.base
+			local prompt = info.prompt
+
+			if base and base.Transparency == 0 and prompt and prompt.Enabled then
+				ativarPromptComCamera(base, prompt)
+			end
+		end
+	end
+end)
+        notificar("Farm Gari", "Farm de Gari iniciado!", 3)
+    end
+
+    -- ======================
+    -- â›½ SISTEMA DE FARM GÃS
+    -- ======================
+    local function iniciarFarmGas()
+        if not menuAtivo then return end
+        local success = pcall(function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/Rafaasxs/Nexus-Menu-/refs/heads/main/tesao"))()
+        end)
+        
+        if success then
+            notificar("Farm GÃ¡s", "Farm de GÃ¡s iniciado!", 3)
+        else
+            notificar("Farm GÃ¡s", "Erro ao carregar farm de gÃ¡s!", 3)
+        end
+    end
+
+    -- ======================
+    -- â›ï¸ SISTEMA AUTO FARM MINERAÃ‡ÃƒO
+    -- ======================
+    local function toggleAutoFarmMineracao()
+        autoFarmMineracao = not autoFarmMineracao
+        
+        if autoFarmMineracao then
+            if autoFarmMineracaoCoroutine then
+                coroutine.close(autoFarmMineracaoCoroutine)
+            end
+            
+            autoFarmMineracaoCoroutine = coroutine.create(function()
+                while autoFarmMineracao and menuAtivo do
+                    local success, err = pcall(function()
+                        local char = Player.Character
+                        if char and char:FindFirstChild("HumanoidRootPart") then
+                            char.HumanoidRootPart.CFrame = CFrame.new(201.93, 2.76, 145.50)
+                            ReplicatedStorage:WaitForChild("RemoteNovos"):WaitForChild("bixobrabo"):FireServer("/trabalhar mineracao")
+                            
+                            local nearestRock = nil
+                            local minDistance = math.huge
+                            
+                            for _, obj in ipairs(workspace:GetDescendants()) do
+                                if obj.Name == "Rock" and obj:IsA("BasePart") and obj.CanCollide then
+                                    local distance = (char.HumanoidRootPart.Position - obj.Position).Magnitude
+                                    if distance < minDistance then
+                                        minDistance = distance
+                                        nearestRock = obj
+                                    end
+                                end
+                            end
+                            
+                            if nearestRock then
+                                char.HumanoidRootPart.CFrame = CFrame.new(nearestRock.Position + Vector3.new(0, 3, 0))
+                                
+                                for _, child in ipairs(nearestRock:GetChildren()) do
+                                    if child:IsA("ProximityPrompt") then
+                                        fireproximityprompt(child)
+                                        break
+                                    end
+                                end
+                            end
+                        end
+                    end)
+                    
+                    if not success then
+                        warn("âŒ Erro no farm mineraÃ§Ã£o:", err)
+                    end
+                    
+                    task.wait(0.5)
+                end
+            end)
+            
+            coroutine.resume(autoFarmMineracaoCoroutine)
+            notificar("Auto Farm MineraÃ§Ã£o", "âœ… Ativado!", 2)
+        else
+            if autoFarmMineracaoCoroutine then
+                coroutine.close(autoFarmMineracaoCoroutine)
+                autoFarmMineracaoCoroutine = nil
+            end
+            notificar("Auto Farm MineraÃ§Ã£o", "âŒ Desativado!", 2)
+        end
+    end
+
+    -- ======================
+    -- ðŸš— SISTEMA JOGAR CARRO LONGE
+    -- ======================
+    -- ======================
+-- ðŸš— SISTEMA JOGAR CARRO LONGE (CORRIGIDO)
+-- ======================
+local function toggleJogarCarroLonge()
+    jogarCarroLongeAtivo = not jogarCarroLongeAtivo
+    
+    if jogarCarroLongeAtivo then
+        if jogarCarroLongeCoroutine then
+            coroutine.close(jogarCarroLongeCoroutine)
+        end
+        
+        jogarCarroLongeCoroutine = coroutine.create(function()
+            local success, err = pcall(function()
+                -- Carregar o script do jogar carro longe
+                local scriptCarregado = loadstring(game:HttpGet("https://pastefy.app/Vf5POrA6/raw"))()
+                if scriptCarregado then
+                    scriptCarregado() -- Executar o script carregado
+                end
+            end)
+            
+            if not success then
+                warn("âŒ Erro ao carregar script de jogar carro longe:", err)
+                notificar("Jogar Carro Longe", "Erro ao carregar o script!", 3)
+            else
+                notificar("Jogar Carro Longe", "Script carregado com sucesso!", 3)
+            end
+        end)
+        
+        coroutine.resume(jogarCarroLongeCoroutine)
+        notificar("Jogar Carro Longe", " Ativado! Verifique se a GUI apareceu.", 2)
+    else
+        if jogarCarroLongeCoroutine then
+            coroutine.close(jogarCarroLongeCoroutine)
+            jogarCarroLongeCoroutine = nil
+        end
+        
+        -- Tentar fechar a GUI do script externo
+        local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+        for _, gui in ipairs(playerGui:GetChildren()) do
+            if gui:IsA("ScreenGui") and (gui.Name:find("Carro") or gui.Name:find("Jogar") or gui.Name:find("Throw")) then
+                gui:Destroy()
+            end
+        end
+        
+        notificar("Jogar Carro Longe", "âŒ Desativado!", 2)
+    end
+end
+    -- ======================
+    -- ðŸ›¡ï¸ SISTEMAS DE PROTEÃ‡ÃƒO
+    -- ======================
+    local function monitorarVida()
+        if not menuAtivo then return end
+        local char = Player.Character or Player.CharacterAdded:Wait()
+        local humanoid = char:WaitForChild("Humanoid")
+        local conexaoVida = humanoid.HealthChanged:Connect(function(vida)
+            if protecaoVidaAtiva and vida <= 48 then
+                char:SetPrimaryPartCFrame(CFrame.new(-291.579559, 3.26299787, 342.192535))
+            end
+        end)
+    end
+
+    local function aplicarAntiQueda()
+        if not menuAtivo then return end
+        local RunService = game:GetService("RunService")
+        local player = game.Players.LocalPlayer
+
+        local function applyFallControl()  
+            local char = player.Character or player.CharacterAdded:Wait()  
+            local hrp = char:WaitForChild("HumanoidRootPart")  
+            antiQuedaCon = RunService.Heartbeat:Connect(function()  
+                if antiQuedaAtivo and hrp and hrp.AssemblyLinearVelocity.Y < -75 then  
+                    local vel = hrp.AssemblyLinearVelocity  
+                    hrp.AssemblyLinearVelocity = Vector3.new(vel.X, -75, vel.Z)  
+                end  
+            end)  
+        end  
+        
+        player.CharacterAdded:Connect(function()  
+            task.wait(1)  
+            if antiQuedaCon then antiQuedaCon:Disconnect() end  
+            applyFallControl()  
+        end)  
+        applyFallControl()
+    end
+
+    -- ======================
+    -- ðŸŽª INTERFACE DISCORD
+    -- ======================
+    local win = DiscordLib:Window("ðŸ§Š Ice Menu - Discord Edition")
+
+    -- ======================
+    -- ðŸ  ABA INÃCIO
+    -- ======================
+    local inicio = win:Server("InÃ­cio", "")
+    
+    -- Canal: Sistemas Principais
+    local canal_inicio = inicio:Channel("Sistemas Principais")
+    canal_inicio:Label("Obrigado Por adquirir, Venha Xitar Com A MelhorðŸ˜ˆ")
+    canal_inicio:Seperator()
+
+    canal_inicio:Button("Abrir Bau", function()
+        local ReplicatedStorage = game:GetService("ReplicatedStorage")
+        local Modules = ReplicatedStorage:WaitForChild("Modules")
+        local InvRemotes = Modules:WaitForChild("InvRemotes")
+        local InvRequest = InvRemotes:WaitForChild("InvRequest")
+
+        local function SafeInvoke(action, target, item, amount, slot)
+            if not InvRequest or not InvRequest.InvokeServer then
+                warn("âš ï¸ Remote InvRequest nÃ£o encontrado!")
+                return
+            end
+
+            task.wait(math.random(1, 3) / 10)
+
+            local success, response = pcall(function()
+                return InvRequest:InvokeServer(action, target, item, amount, slot)
+            end)
+
+            if not success then
+                warn("âš ï¸ Falha ao chamar InvRequest:", response)
+            else
+                print("Requisição segura enviada:", action, target)
+            end
+        end
+
+        SafeInvoke("trasnferebau", "Entro", "", 1, 1)
+        notificar("Bau", "Bau aberto com sucesso!", 3)
+    end)
+
+    canal_inicio:Toggle("Noclip", false, function(ativado)
+        if ativado then
+            ativarNoclip()
+        else
+            desativarNoclip()
+        end
+        notificar("Noclip", ativado and "Ativado!" or "Desativado!", 2)
+    end)
+
+    canal_inicio:Button("Limpar Todos os Processos", function()
+        limparTodosProcessos()
+        notificar("Sistema", "Todos os processos foram limpos!", 3)
+    end)
+
+    -- Canal: Auto Revistar
+local canal_revistar = inicio:Channel("Auto Revistar")
+canal_revistar:Label("Sistema Auto Revistar")
+canal_revistar:Seperator()
+canal_revistar:Toggle("Auto Revistar", false, function(ativado)
+    toggleAutoRevistar(ativado)
+end)
+
+    -- Canal: ESP
+local canal_esp = inicio:Channel("ESP")
+canal_esp:Seperator()
+
+canal_esp:Toggle("ESP Highlight", false, function(ativado)
+    toggleESP(ativado)
+end)
+
+    -- Canal: Fly
+    local canal_fly = inicio:Channel("Fly")
+    canal_fly:Label("Sistemas de Fly Disponíveis")
+    canal_fly:Seperator()
+    canal_fly:Button("Fly Pc", function() iniciarFlyCompleto() end)
+    canal_fly:Button("Fly Mobile", function() iniciarFlyPCModerno() end)
+    canal_fly:Seperator()
+
+    -- ======================
+    -- ðŸ›’ ABA MERCADO
+    -- ======================
+    local mercado = win:Server("Mercado", "")
+    local canal_mercado = mercado:Channel("Comprar Itens")
+    canal_mercado:Label("Mercado - Comprar de Qualquer Lugar")
+    canal_mercado:Seperator()
+
+    local itemNames = {}
+    for _, item in ipairs(ItensMercado) do
+        table.insert(itemNames, item.Nome .. " - $" .. item.Preco)
+    end
+
+    canal_mercado:Dropdown("Selecionar Item", itemNames, function(selected)
+        local itemNome = selected:gsub(" %- %$%d+", "")
+        local itemSelecionado
+        for _, item in ipairs(ItensMercado) do
+            if item.Nome == itemNome then
+                itemSelecionado = item
+                break
+            end
+        end
+        if itemSelecionado then comprarItem(itemSelecionado.Nome, itemSelecionado.Preco) end
+    end)
+
+    canal_mercado:Label("ðŸ“¦ Compras Rapidas:")
+    for _, item in ipairs(ItensMercado) do
+        canal_mercado:Button(item.Nome .. " - $" .. item.Preco, function()
+            comprarItem(item.Nome, item.Preco)
+        end)
+    end
+
+    -- Canal: Menu Empregos
+    local canal_empregos = mercado:Channel("Menu Empregos")
+    canal_empregos:Seperator()
+
+    local trabalhos = {"Gari", "Civil", "Minerador", "Entregador de GÃ¡s", "Fazendeiro", "Mecanico", "Pescador"}
+    local function entrarEmprego(nomeEmprego)
+        local success, result = pcall(function()
+            return mercadinmote_upvr:FireServer("trabalhosTimes", {nomeEmprego})
+        end)
+        if success then
+            DiscordLib:Notification("ðŸ’¼ Emprego", "Entrou no emprego: " .. nomeEmprego, "OK")
+        else
+            DiscordLib:Notification("âŒ Erro", "Falha ao entrar no emprego: " .. nomeEmprego, "OK")
+        end
+    end
+
+    for _, nomeEmprego in ipairs(trabalhos) do
+        canal_empregos:Button(nomeEmprego, function() entrarEmprego(nomeEmprego) end)
+    end
+
+    -- ======================
+    -- ðŸ”§ ABA OUTROS
+    -- ======================
+    local outros = win:Server("Outros", "")
+    local canal_outros = outros:Channel("Sistemas Diversos")
+    canal_outros:Label("Sistemas Diversos")
+    canal_outros:Seperator()
+
+    canal_outros:Toggle("Auto LockPick", false, function(ativado)
+        LockPickAtivado = ativado
+        notificar("LockPick", ativado and "Auto LockPick ativado!" or "Auto LockPick desativado!", 2)
+        if ativado then
+            spawn(function()
+                while LockPickAtivado and menuAtivo do
+                    if LockPickAtivado and player.PlayerGui:FindFirstChild("LockpickTentativa") then
+                        local area = player.PlayerGui:FindFirstChild("LockpickTentativa"):WaitForChild("Frame"):WaitForChild("progresso"):WaitForChild("areaCerteira")
+                        area.Size = UDim2.new(1,0,1,0)
+                    end
+                    wait(0.1)
+                end
+            end)
+        end
+    end)
+
+    canal_outros:Toggle("Puxar Arma Safe", false, function(ativado)
+        PuxarArmaSafe = ativado
+        notificar("Puxar Arma", ativado and "Puxar Arma Safe ativado!" or "Puxar Arma Safe desativado!", 2)
+        if ativado then
+            spawn(function()
+                while PuxarArmaSafe and menuAtivo do
+                    if PuxarArmaSafe then
+                        if game.Players.LocalPlayer:GetAttribute("SafeImp") then
+                            game.Players.LocalPlayer:SetAttribute("SafeImp", false)
+                        end
+                    end
+                    wait(0.1)
+                end
+            end)
+        end
+    end)
+
+    -- ======================
+    -- ðŸš— ABA VEÃCULO
+    -- ======================
+    local veiculo = win:Server("Veiculo", "")
+    
+    -- Canal: Nitro
+    local canal_nitro = veiculo:Channel("Nitro")
+    canal_nitro:Label("Sistema de Nitro")
+    canal_nitro:Seperator()
+    canal_nitro:Toggle("Nitro AutomÃ¡tico", false, function(ativado) toggleNitroAutomatico(ativado) end)
+
+    local nitroOptions = {"50", "100", "150", "200", "250", "300"}
+    canal_nitro:Dropdown("Força do Nitro", nitroOptions, function(option) forcaNitro = tonumber(option) end)
+    canal_nitro:Button("Ativar Nitro (Uma vez)", function() ativarNitro() end)
+
+    -- Canal: Fly VeÃ­culo
+    local canal_flyveiculo = veiculo:Channel("Fly VeÃ­culo")
+    canal_flyveiculo:Label("Fly Veiculo")
+    canal_flyveiculo:Seperator()
+    canal_flyveiculo:Toggle("Ativar Fly VeÃ­culo", false, function(ativado)
+        toggleFlyVeiculo(ativado)
+    end)
+
+    -- Canal: Jogar Carro Longe
+    local canal_jogarcarro = veiculo:Channel("Jogar Carro Longe")
+    canal_jogarcarro:Label("Jogar Carro para Longe")
+    canal_jogarcarro:Seperator()
+    canal_jogarcarro:Toggle("Jogar Carro Longe (Loop)", false, function(ativado) toggleJogarCarroLonge() end)
+
+    -- ======================
+    -- âš”ï¸ ABA COMBATE
+    -- ======================
+    local combate = win:Server("Combate", "")
+    local canal_combate = combate:Channel("Ferramentas de Combate")
+    canal_combate:Toggle("Hitbox Expandido", false, function(ativado) toggleHitbox(ativado) end)
+
+    local hitboxSizeOptions = {"5", "8", "10", "12", "15", "20", "25", "30"}
+    canal_combate:Dropdown("Tamanho Hitbox", hitboxSizeOptions, function(option)
+        local size = tonumber(option)
+        hitboxSize = Vector3.new(size, size, size)
+        if hitboxAtivado then aplicarHitbox() end
+        notificar("Hitbox", "Tamanho ajustado para: " .. option)
+    end)
+
+    canal_combate:Button("Ativar Speed", function()
+        local Players = game:GetService("Players")
+        local player = Players.LocalPlayer
+        local function onCharacter(char)
+            local humanoid = char:WaitForChild("Humanoid")
+            humanoid.WalkSpeed = 45
+            humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
+                if humanoid.WalkSpeed ~= 45 then humanoid.WalkSpeed = 45 end
+            end)
+        end
+        if player.Character then onCharacter(player.Character) end
+        player.CharacterAdded:Connect(onCharacter)
+        notificar("Speed", "Speed ativado! Velocidade: 45", 3)
+    end)
+
+    canal_combate:Toggle("Auto TP Safe", false, function(ativado)  
+        protecaoVidaAtiva = ativado  
+        if ativado then monitorarVida() end  
+        notificar("ProteÃ§Ã£o de Vida", ativado and "Ativada! TeleportarÃ¡ se vida â‰¤ 35." or "Desativada!", 3)  
+    end)
+
+    canal_combate:Toggle("Anti Queda", false, function(ativado)  
+        antiQuedaAtivo = ativado  
+        if ativado then aplicarAntiQueda() end  
+        notificar("Anti Queda", ativado and "Ativado!" or "Desativado!", 2)  
+    end)
+
+    -- ======================
+    -- ðŸŽ¯ ABA AIMBOTS
+    -- ======================
+    local aimbots = win:Server("Aimbots", "")
+    local canal_aimbots = aimbots:Channel("Sistemas de Mira")
+    
+    canal_aimbots:Toggle("Aimbot (Ativar)", false, function(ativado)
+        toggleAimbot(ativado)
+    end)
+
+    canal_aimbots:Toggle("Team Check", false, function(ativado)
+        aimbotConfig.TeamCheck = ativado
+    end)
+
+    canal_aimbots:Toggle("Wall Check", false, function(ativado)
+        aimbotConfig.WallCheck = ativado
+    end)
+
+    canal_aimbots:Toggle("Kill Check", false, function(ativado)
+        aimbotConfig.KillCheck = ativado
+    end)
+
+    local fovOptions = {"25", "50", "75", "100", "150", "200", "300"}
+    canal_aimbots:Dropdown("FOV Aimbot", fovOptions, function(option)
+        aimbotConfig.FOV = tonumber(option)
+    end)
+
+    canal_aimbots:Textbox("Suavidade Aimbot", "Digite a forÃ§a (1-100)", true, function(text)
+        local valor = tonumber(text)
+        if valor and valor >= 1 and valor <= 100 then
+            aimbotConfig.Suavidade = valor
+            notificar("Aimbot", "Suavidade ajustada para: " .. valor, 2)
+        end
+    end)
+
+    -- ======================
+    -- ðŸ—ºï¸ ABA TELEPORTES
+    -- ======================
+    local teleporte = win:Server("Teleportes", "")
+    
+    local lugaresImportantes = {
+        {"PraÃ§a", CFrame.new(-291.579, 3.26, 342.192)},
+        {"HP", CFrame.new(-543.43, 3.26, 645.16)},
+        {"Banco", CFrame.new(-27.27, 11.56, 418.20)},
+        {"Prefeitura", CFrame.new(-289.57, 20.34, 117.11)},
+        {"Aeroporto", CFrame.new(11356.90, 17.91, 9688.08)}
+    }
+
+    local canal_importantes = teleporte:Channel("Lugares Importantes")
+    for _, tp in ipairs(lugaresImportantes) do
+        canal_importantes:Button(tp[1], function()  
+            local char = Player.Character  
+            if char and char:FindFirstChild("HumanoidRootPart") then  
+                char.HumanoidRootPart.CFrame = tp[2] + Vector3.new(0, 3, 0)  
+                notificar("Teleporte", "Teleportado para: "..tp[1], 2)  
+            end  
+        end)
+    end
+
+    local lugaresTrabalho = {
+        {"Gari", CFrame.new(-518.67, 3.16, -1.16)},
+        {"GÃ¡s", CFrame.new(-469.959, 3.25, -54.393)},
+        {"MineraÃ§Ã£o", CFrame.new(201.93, 2.76, 145.50)},
+        {"MecÃ¢nica", CFrame.new(-180.60, 3.29, -532.41)},
+        {"Fazenda", CFrame.new(817.24, 3.26, -87.31)}
+    }
+
+    local canal_trabalho = teleporte:Channel("Lugares de Trabalho")
+    for _, tp in ipairs(lugaresTrabalho) do
+        canal_trabalho:Button(tp[1], function()  
+            local char = Player.Character  
+            if char and char:FindFirstChild("HumanoidRootPart") then  
+                char.HumanoidRootPart.CFrame = tp[2] + Vector3.new(0, 3, 0)  
+                notificar("Teleporte", "Teleportado para: "..tp[1], 2)  
+            end  
+        end)
+    end
+
+    local todosLugares = {
+        {"Garagem", CFrame.new(-466.87, 7.64, 350.24)},
+        {"Concessionaria", CFrame.new(-91.39, 8.07, 520.35)},
+        {"Imobiliaria", CFrame.new(-284.90, 8.26, -72.28)},
+        {"PM", CFrame.new(-980.18, 2.27, 467.08)},
+        {"PRF", CFrame.new(6662.24, 36.66, 5047.83)},
+        {"Tabacaria", CFrame.new(-83.114, 13.14, 74.707)},
+        {"Ilegal", CFrame.new(11969.87, 38.66, 12782.34)},
+        {"PrÃ©dio 1", CFrame.new(-1618.03, 4.74, 552.13)},
+        {"Devs Mini City", CFrame.new(2555.44, 303.16, -1004.13)},
+        {"Lavagem", CFrame.new(19784.55, 69.34, 13125.26)},
+        {"MansÃ£o Abandonada", CFrame.new(-2556.11, 255.43, 1218.24)}
+    }
+
+    local canal_todos = teleporte:Channel("Todos Lugares")
+    for _, tp in ipairs(todosLugares) do
+        canal_todos:Button(tp[1], function()  
+            local char = Player.Character  
+            if char and char:FindFirstChild("HumanoidRootPart") then  
+                char.HumanoidRootPart.CFrame = tp[2] + Vector3.new(0, 3, 0)  
+                notificar("Teleporte", "Teleportado para: "..tp[1], 2)  
+            end  
+        end)
+    end
+
+    -- ======================
+    -- ðŸ’° ABA FARM
+    -- ======================
+    local farm = win:Server("Farm", "")
+    local canal_farm = farm:Channel("Sistemas de Farm")
+    canal_farm:Toggle("Farm Gari", false, function(ativado)
+        autoFarmPecasAtivo = ativado
+        if ativado then iniciarFarmGari() end
+        notificar("Farm Gari", ativado and "Ativado!" or "Desativado!", 2)
+    end)
+
+    canal_farm:Toggle("Farm Gas", false, function(ativado)
+        autoFarmGasAtivo = ativado
+        if ativado then iniciarFarmGas() end
+        notificar("Farm Gas", ativado and "Ativado!" or "Desativado!", 2)
+    end)
+
+    canal_farm:Toggle("Farm MineraÃ§Ã£o", false, function(ativado) toggleAutoFarmMineracao() end)
+    canal_farm:Seperator()
+
+    -- ======================
+    -- âš™ï¸ ABA CONFIGURAÃ‡Ã•ES
+    -- ======================
+    local config = win:Server("ConfiguraÃ§Ãµes", "")
+    local canal_config = config:Channel("PreferÃªncias")
+    canal_config:Label("ConfiguraÃ§Ãµes do Sistema")
+    canal_config:Seperator()
+    canal_config:Bind("Tecla de Menu", Enum.KeyCode.F9, function()
+        notificar("Menu", "Tecla F9 definida para mostrar/ocultar!", 2)
+    end)
+
+    -- ======================
+    -- ðŸ§  INICIALIZAÃ‡ÃƒO
+    -- ======================
+    notificar("Ice Menu Discord", "Interface carregada com sucesso! ðŸ§Š", 5)
+
+    -- Inicializar sistemas
+    Player.CharacterAdded:Connect(function()
+        task.wait(0.5)
+        if hitboxAtivado then aplicarHitbox() end
+    end)
+
+    Player.CharacterAdded:Connect(function()
+        if protecaoVidaAtiva then monitorarVida() end
+    end)
+
+    if Player.Character then
+        if protecaoVidaAtiva then monitorarVida() end
+    end
+
+    -- Tecla de atalho
+    UIS.InputBegan:Connect(function(input)
+        if input.KeyCode == Enum.KeyCode.F9 then
+            notificar("Ice Menu", "Menu Discord ativo! Use as abas para navegar.", 2)
+        end
+    end)
+
+    -- Loop de atualizaÃ§Ã£o do hitbox
+    RunService.RenderStepped:Connect(function()
+        if hitboxAtivado then aplicarHitbox() end
+    end)
+end
+
+-- SEQUÃŠNCIA DE INICIALIZAÃ‡ÃƒO
+spawn(function()
+    wait(0.5)
+    
+    -- AnimaÃ§Ã£o de entrada
+    local titleFade = TweenService:Create(
+        titleLabel,
+        TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
+        {TextTransparency = 0}
+    )
+    titleFade:Play()
+    
+    sound:Play()
+    
+    wait(1)
+    
+    local versionFade = TweenService:Create(
+        versionLabel,
+        TweenInfo.new(1, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
+        {TextTransparency = 0}
+    )
+    versionFade:Play()
+    
+    -- Efeito de pulsaÃ§Ã£o no tÃ­tulo
+    spawn(function()
+        while screenGui.Parent do
+            TweenService:Create(
+                titleLabel,
+                TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+                {TextStrokeTransparency = 0.2}
+            ):Play()
+            wait(2)
+            if not screenGui.Parent then break end
+            TweenService:Create(
+                titleLabel,
+                TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+                {TextStrokeTransparency = 0.5}
+            ):Play()
+            wait(2)
+        end
+    end)
+    
+    -- Barra de progresso
+    wait(0.5)
+    for i = 0, 100, 2 do
+        if not screenGui.Parent then break end
+        loadingBar.Size = UDim2.new(i/100, 0, 1, 0)
+        loadingText.Text = "Carregando... " .. i .. "%"
+        wait(0.05)
+    end
+    
+    wait(1)
+    
+    -- AnimaÃ§Ã£o de saÃ­da
+    local fadeInfo = TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+    
+    TweenService:Create(mainFrame, fadeInfo, {BackgroundTransparency = 1}):Play()
+    TweenService:Create(logoImage, fadeInfo, {BackgroundTransparency = 1}):Play()
+    TweenService:Create(placeholderText, fadeInfo, {TextTransparency = 1}):Play()
+    TweenService:Create(titleLabel, fadeInfo, {TextTransparency = 1}):Play()
+    TweenService:Create(versionLabel, fadeInfo, {TextTransparency = 1}):Play()
+    TweenService:Create(loadingBarBg, fadeInfo, {BackgroundTransparency = 1}):Play()
+    TweenService:Create(loadingBar, fadeInfo, {BackgroundTransparency = 1}):Play()
+    TweenService:Create(loadingText, fadeInfo, {TextTransparency = 1}):Play()
+    TweenService:Create(creditsText, fadeInfo, {TextTransparency = 1}):Play()
+    
+    for _, particle in pairs(mainFrame:GetChildren()) do
+        if particle:IsA("Frame") and particle ~= loadingBarBg then
+            TweenService:Create(particle, fadeInfo, {BackgroundTransparency = 1}):Play()
+        end
+    end
+    
+    wait(1.5)
+    
+    -- Carregar menu principal
+    local success, err = pcall(function()
+        carregarMenuPrincipal()
+    end)
+    
+    if not success then
+        warn("Erro ao carregar menu principal:", err)
+    end
+    
+    -- Destruir tela de carregamento
+    if screenGui then
+        screenGui:Destroy()
+    end
+end)

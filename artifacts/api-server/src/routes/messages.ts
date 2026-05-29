@@ -1,7 +1,10 @@
 import { Router } from "express";
 import { db, messagesTable, conversationsTable, settingsTable } from "@workspace/db";
-import { eq, asc, desc } from "drizzle-orm";
+import { eq, asc } from "drizzle-orm";
 import { GoogleGenAI } from "@google/genai";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 import {
   ListMessagesParams,
   SendMessageParams,
@@ -9,8 +12,33 @@ import {
 } from "@workspace/api-zod";
 
 const router = Router();
-
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const uploadsDir = path.join(__dirname, "../../uploads");
+
+const IMAGE_MIME_TYPES: Record<string, string> = {
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".png": "image/png",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
+};
+
+function getImageData(fileUrl: string): { mimeType: string; data: string } | null {
+  try {
+    const filename = path.basename(fileUrl);
+    const ext = path.extname(filename).toLowerCase();
+    const mimeType = IMAGE_MIME_TYPES[ext];
+    if (!mimeType) return null;
+    const filePath = path.join(uploadsDir, filename);
+    if (!fs.existsSync(filePath)) return null;
+    const data = fs.readFileSync(filePath).toString("base64");
+    return { mimeType, data };
+  } catch {
+    return null;
+  }
+}
 
 function buildSystemPrompt(settings?: typeof settingsTable.$inferSelect | null): string {
   const executor = settings?.executor || "any executor";
@@ -171,18 +199,30 @@ router.post("/conversations/:id/chat", async (req, res) => {
 
     const genai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
-    // Build Gemini contents (system prompt passed via systemInstruction, not contents)
-    const geminiContents = chatHistory.map((m) => ({
-      role: m.role === "assistant" ? "model" : "user",
-      parts: [{ text: m.content }],
-    }));
+    // Build Gemini contents — attach inline image for the last user message if present
+    const geminiContents = chatHistory.map((m, idx) => {
+      const isLastUser = m.role === "user" && idx === chatHistory.length - 1;
+      const parts: Array<Record<string, unknown>> = [{ text: m.content }];
+
+      if (isLastUser && body.fileUrl) {
+        const imgData = getImageData(body.fileUrl);
+        if (imgData) {
+          parts.push({ inlineData: { mimeType: imgData.mimeType, data: imgData.data } });
+        }
+      }
+
+      return {
+        role: m.role === "assistant" ? "model" : "user",
+        parts,
+      };
+    });
 
     const response = await genai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: geminiContents,
       config: {
         systemInstruction: systemPrompt,
-        maxOutputTokens: 8192,
+        maxOutputTokens: 65536,
         temperature: 0.7,
       },
     });
