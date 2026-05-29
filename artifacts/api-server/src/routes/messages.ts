@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, messagesTable, conversationsTable, settingsTable } from "@workspace/db";
 import { eq, asc, desc } from "drizzle-orm";
-import Groq from "groq-sdk";
+import { GoogleGenAI } from "@google/genai";
 import {
   ListMessagesParams,
   SendMessageParams,
@@ -10,7 +10,7 @@ import {
 
 const router = Router();
 
-const GROQ_API_KEY = process.env.GROQ_API_KEY || "";
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 
 function buildSystemPrompt(settings?: typeof settingsTable.$inferSelect | null): string {
   const executor = settings?.executor || "any executor";
@@ -134,21 +134,16 @@ router.post("/conversations/:id/chat", async (req, res) => {
 
     const systemPrompt = buildSystemPrompt(settings);
 
-    // Build messages array for Groq
-    const groqMessages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
-      { role: "system", content: systemPrompt },
-    ];
+    // Build message history for Gemini
+    const chatHistory: Array<{ role: "user" | "assistant" | "system"; content: string }> = [];
 
     for (const msg of history) {
-      if (msg.id === userMsg.id) continue; // Skip current message, we add it separately
+      if (msg.id === userMsg.id) continue; // Skip current message, added separately
       let content = msg.content;
       if (msg.fileUrl && msg.fileName) {
         content = `[Attached file: ${msg.fileName}]\n\n${content}`;
       }
-      groqMessages.push({
-        role: msg.role as "user" | "assistant",
-        content,
-      });
+      chatHistory.push({ role: msg.role as "user" | "assistant", content });
     }
 
     // Add current user message with file context if any
@@ -156,55 +151,43 @@ router.post("/conversations/:id/chat", async (req, res) => {
     if (body.fileUrl && body.fileName) {
       userContent = `[Attached file: ${body.fileName}]\n\n${body.content}`;
     }
-    groqMessages.push({ role: "user", content: userContent });
+    chatHistory.push({ role: "user", content: userContent });
 
-    if (!GROQ_API_KEY) {
-      // Save placeholder and return
+    if (!GEMINI_API_KEY) {
       const [aiMsg] = await db
         .insert(messagesTable)
         .values({
           conversationId: id,
           role: "assistant",
-          content: "⚠️ GROQ_API_KEY is not configured. Please add your Groq API key in the environment settings.",
+          content: "⚠️ GEMINI_API_KEY não configurada. Adicione sua chave do Google Gemini nas configurações.",
         })
         .returning();
-
-      // Auto-title conversation if it's new
       if (history.length <= 1) {
         const title = body.content.slice(0, 60) + (body.content.length > 60 ? "..." : "");
         await db.update(conversationsTable).set({ title }).where(eq(conversationsTable.id, id));
       }
-
       return res.json(aiMsg);
     }
 
-    const groq = new Groq({ apiKey: GROQ_API_KEY });
+    const genai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
-    // Try primary model, fall back if rate limited
-    let completion;
-    const models = ["llama-3.3-70b-versatile", "llama-3.1-70b-versatile", "llama-3.1-8b-instant", "gemma2-9b-it"];
-    let lastError: any;
-    for (const model of models) {
-      try {
-        completion = await groq.chat.completions.create({
-          model,
-          messages: groqMessages,
-          temperature: 0.7,
-          max_tokens: 8192,
-        });
-        break;
-      } catch (e: any) {
-        lastError = e;
-        if (e?.status === 429) {
-          req.log.warn({ model }, "Rate limited, trying fallback model");
-          continue;
-        }
-        throw e;
-      }
-    }
-    if (!completion) throw lastError;
+    // Build Gemini contents (system prompt passed via systemInstruction, not contents)
+    const geminiContents = chatHistory.map((m) => ({
+      role: m.role === "assistant" ? "model" : "user",
+      parts: [{ text: m.content }],
+    }));
 
-    const aiContent = completion.choices[0]?.message?.content || "No response generated.";
+    const response = await genai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: geminiContents,
+      config: {
+        systemInstruction: systemPrompt,
+        maxOutputTokens: 8192,
+        temperature: 0.7,
+      },
+    });
+
+    const aiContent = response.text || "Sem resposta gerada.";
 
     // Save AI response
     const [aiMsg] = await db
@@ -219,28 +202,24 @@ router.post("/conversations/:id/chat", async (req, res) => {
     // Auto-title conversation if it's the first exchange
     if (history.length <= 1) {
       try {
-        const titleCompletion = await groq.chat.completions.create({
-          model: "llama-3.1-8b-instant",
-          messages: [
+        const titleResponse = await genai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: [
             {
               role: "user",
-              content: `Generate a short, concise title (max 6 words, no quotes) for a Roblox scripting conversation that starts with this message: "${body.content.slice(0, 200)}"`,
+              parts: [{ text: `Generate a short, concise title (max 6 words, no quotes) for a Roblox scripting conversation that starts with this message: "${body.content.slice(0, 200)}"` }],
             },
           ],
-          temperature: 0.5,
-          max_tokens: 30,
+          config: { maxOutputTokens: 30, temperature: 0.3 },
         });
-
         const title =
-          titleCompletion.choices[0]?.message?.content?.trim().replace(/^["']|["']$/g, "") ||
+          titleResponse.text?.trim().replace(/^["']|["']$/g, "") ||
           body.content.slice(0, 50);
-
         await db
           .update(conversationsTable)
           .set({ title: title.slice(0, 100) })
           .where(eq(conversationsTable.id, id));
       } catch {
-        // Title generation failed, use first 50 chars
         const title = body.content.slice(0, 50) + (body.content.length > 50 ? "..." : "");
         await db.update(conversationsTable).set({ title }).where(eq(conversationsTable.id, id));
       }
@@ -249,11 +228,7 @@ router.post("/conversations/:id/chat", async (req, res) => {
     res.json(aiMsg);
   } catch (err: any) {
     req.log.error({ err }, "Failed to send message");
-    const isRateLimit = err?.status === 429 || err?.message?.includes("rate_limit");
-    const errorMsg = isRateLimit
-      ? "Rate limit reached. Daily token limit exhausted — please wait ~1 hour or upgrade your Groq plan."
-      : (err?.message || "Failed to process message");
-    res.status(isRateLimit ? 429 : 500).json({ error: errorMsg });
+    res.status(500).json({ error: err?.message || "Falha ao processar mensagem" });
   }
 });
 

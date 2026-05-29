@@ -1,5 +1,5 @@
 import { Router } from "express";
-import Groq from "groq-sdk";
+import { GoogleGenAI } from "@google/genai";
 import {
   AnalyzeScriptBody,
   ScanRemotesBody,
@@ -9,23 +9,21 @@ import {
 } from "@workspace/api-zod";
 
 const router = Router();
-const GROQ_API_KEY = process.env.GROQ_API_KEY || "";
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 
-async function callGroq(systemPrompt: string, userPrompt: string): Promise<string> {
-  if (!GROQ_API_KEY) {
-    throw new Error("GROQ_API_KEY is not configured");
-  }
-  const groq = new Groq({ apiKey: GROQ_API_KEY });
-  const completion = await groq.chat.completions.create({
-    model: "llama-3.3-70b-versatile",
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt },
-    ],
-    temperature: 0.3,
-    max_tokens: 8192,
+async function callGemini(systemPrompt: string, userPrompt: string): Promise<string> {
+  if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY não configurada");
+  const genai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+  const response = await genai.models.generateContent({
+    model: "gemini-2.5-flash",
+    contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+    config: {
+      systemInstruction: systemPrompt,
+      maxOutputTokens: 8192,
+      temperature: 0.3,
+    },
   });
-  return completion.choices[0]?.message?.content || "";
+  return response.text || "";
 }
 
 router.post("/tools/analyze-script", async (req, res) => {
@@ -42,7 +40,7 @@ router.post("/tools/analyze-script", async (req, res) => {
 }
 Rules: Be thorough, find nil access, missing task.wait(), memory leaks, deprecated APIs, infinite loops without yields, unclosed connections, missing pcall on remote calls. Always provide the complete fixed code.`;
 
-    const response = await callGroq(
+    const response = await callGemini(
       systemPrompt,
       `Analyze this Roblox Lua script:\n\n\`\`\`lua\n${body.code}\n\`\`\``
     );
@@ -86,7 +84,7 @@ router.post("/tools/remote-scanner", async (req, res) => {
   "suggestions": ["general bypass/monitoring suggestions"]
 }`;
 
-    const response = await callGroq(
+    const response = await callGemini(
       systemPrompt,
       `Scan this script for RemoteEvents/RemoteFunctions:\n\n\`\`\`lua\n${body.code}\n\`\`\``
     );
@@ -123,7 +121,7 @@ Be specific about what went wrong and provide a complete, working fixed script.`
       body.originalCode ? `\nOriginal script:\n\`\`\`lua\n${body.originalCode}\n\`\`\`` : ""
     }`;
 
-    const response = await callGroq(systemPrompt, userPrompt);
+    const response = await callGemini(systemPrompt, userPrompt);
 
     let parsed;
     try {
@@ -164,7 +162,7 @@ router.post("/tools/profiler", async (req, res) => {
   "warnings": ["general performance warnings"]
 }`;
 
-    const response = await callGroq(
+    const response = await callGemini(
       systemPrompt,
       `Profile this Roblox Lua script for performance:\n\n\`\`\`lua\n${body.code}\n\`\`\``
     );
@@ -208,7 +206,7 @@ Return JSON with exactly these fields:
 }
 
 Rules:
-- guiCode must be complete and runnable in any executor
+- luaCode must be complete and runnable in any executor
 - Use UDim2.new() for sizes and positions
 - Use Color3.fromRGB() for colors
 - Add smooth tweening animations with TweenService
@@ -219,7 +217,7 @@ Rules:
 
     const userPrompt = `Build a Roblox GUI: ${body.prompt}${imageContext}\nStyle: ${style}`;
 
-    const response = await callGroq(systemPrompt, userPrompt);
+    const response = await callGemini(systemPrompt, userPrompt);
 
     let parsed;
     try {
