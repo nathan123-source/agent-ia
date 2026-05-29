@@ -180,12 +180,29 @@ router.post("/conversations/:id/chat", async (req, res) => {
 
     const groq = new Groq({ apiKey: GROQ_API_KEY });
 
-    const completion = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
-      messages: groqMessages,
-      temperature: 0.7,
-      max_tokens: 8192,
-    });
+    // Try primary model, fall back if rate limited
+    let completion;
+    const models = ["llama-3.3-70b-versatile", "llama-3.1-70b-versatile", "llama-3.1-8b-instant", "gemma2-9b-it"];
+    let lastError: any;
+    for (const model of models) {
+      try {
+        completion = await groq.chat.completions.create({
+          model,
+          messages: groqMessages,
+          temperature: 0.7,
+          max_tokens: 8192,
+        });
+        break;
+      } catch (e: any) {
+        lastError = e;
+        if (e?.status === 429) {
+          req.log.warn({ model }, "Rate limited, trying fallback model");
+          continue;
+        }
+        throw e;
+      }
+    }
+    if (!completion) throw lastError;
 
     const aiContent = completion.choices[0]?.message?.content || "No response generated.";
 
@@ -230,9 +247,13 @@ router.post("/conversations/:id/chat", async (req, res) => {
     }
 
     res.json(aiMsg);
-  } catch (err) {
+  } catch (err: any) {
     req.log.error({ err }, "Failed to send message");
-    res.status(500).json({ error: "Failed to process message" });
+    const isRateLimit = err?.status === 429 || err?.message?.includes("rate_limit");
+    const errorMsg = isRateLimit
+      ? "Rate limit reached. Daily token limit exhausted — please wait ~1 hour or upgrade your Groq plan."
+      : (err?.message || "Failed to process message");
+    res.status(isRateLimit ? 429 : 500).json({ error: errorMsg });
   }
 });
 
