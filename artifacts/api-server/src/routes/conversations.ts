@@ -176,7 +176,7 @@ router.delete("/conversations/:id", async (req, res) => {
     await db.delete(conversationsTable).where(eq(conversationsTable.id, id));
     res.json({ success: true });
   } catch (err) {
-    req.log.error({ err }, "Failed to delete conversation" });
+    req.log.error({ err }, "Failed to delete conversation");
     res.status(500).json({ error: "Failed to delete conversation" });
   }
 });
