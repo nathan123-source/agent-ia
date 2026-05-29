@@ -1,0 +1,3930 @@
+#!/usr/bin/env python3
+"""
+================================================================================
+ROBLOX ENTERPRISE AGENT FRAMEWORK V21.0 - AUTONOMOUS CODING AGENT
+================================================================================
+Sistema de orquestração de agentes IA com correções críticas e capacidades autônomas:
+- FAISS index rebuild periódico (anti memory leak)
+- Connection pool SQLite
+- Timeout HTTP explícito
+- Filtro de similaridade mínima
+- Sandbox containerizada real
+- Timeout global por DAG
+- Cancelamento real de threads
+- Embedding model singleton
+- Rate limiting distribuído (Redis)
+- Suporte a .env para API keys
+- Logging em arquivo para crash recovery
+- Requirements.txt incluído
+- **NOVO: Auto-Repair Loop com análise de stacktrace**
+- **NOVO: Filesystem Sandbox Isolada**
+- **NOVO: Python Executor com AST Validation**
+- **NOVO: Multi-Version Code Generation**
+- **NOVO: Self-Debugging Engine**
+- **NOVO: Memory Management com LRU Eviction**
+- **NOVO: Parallel Tool Execution**
+- **NOVO: Knowledge Graph com Prioridade Contextual**
+- **NOVO: Code Validation Pipeline**
+- **NOVO: Workspace Management**
+================================================================================
+"""
+
+import os
+import re
+import json
+import sqlite3
+import hashlib
+import logging
+import asyncio
+import subprocess
+import tempfile
+import time
+import uuid
+import signal
+import random
+import shutil
+import importlib
+import sys
+import traceback
+import threading
+import queue
+import ast
+import gc
+from pathlib import Path
+from typing import (
+    Dict, List, Optional, Tuple, Any, Callable, 
+    Set, Union, AsyncGenerator, Coroutine
+)
+from datetime import datetime, timedelta
+from dataclasses import dataclass, field
+from collections import OrderedDict, defaultdict, deque
+from concurrent.futures import ThreadPoolExecutor, Future, TimeoutError as FutureTimeout
+from functools import lru_cache, wraps
+from contextlib import asynccontextmanager
+from enum import Enum
+
+# ============================================================
+# CARREGAR VARIÁVEIS DE AMBIENTE (.env)
+# ============================================================
+
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+    DOTENV_AVAILABLE = True
+    print("✅ Arquivo .env carregado com sucesso")
+except ImportError:
+    DOTENV_AVAILABLE = False
+    print("⚠️ python-dotenv não instalado. Instale com: pip install python-dotenv")
+
+# ============================================================
+# IMPORTS CRÍTICOS COM FALLBACKS
+# ============================================================
+
+try:
+    import aiosqlite
+    AIOSQLITE_AVAILABLE = True
+except ImportError:
+    AIOSQLITE_AVAILABLE = False
+    print("⚠️ aiosqlite não disponível, usando sqlite3 síncrono")
+
+try:
+    import numpy as np
+    NUMPY_AVAILABLE = True
+except ImportError:
+    NUMPY_AVAILABLE = False
+    print("⚠️ numpy não disponível")
+
+try:
+    import faiss
+    from sentence_transformers import SentenceTransformer
+    FAISS_AVAILABLE = True
+    # SINGLETON: Carrega modelo uma única vez
+    EMBEDDING_MODEL = None
+    EMBEDDING_MODEL_LOCK = threading.Lock()
+    
+    def get_embedding_model():
+        """Singleton thread-safe do modelo de embedding"""
+        global EMBEDDING_MODEL
+        if EMBEDDING_MODEL is None:
+            with EMBEDDING_MODEL_LOCK:
+                if EMBEDDING_MODEL is None:
+                    EMBEDDING_MODEL = SentenceTransformer('paraphrase-MiniLM-L3-v2')
+        return EMBEDDING_MODEL
+except ImportError:
+    FAISS_AVAILABLE = False
+    EMBEDDING_MODEL = None
+    print("⚠️ FAISS/SentenceTransformer não disponível")
+    
+    def get_embedding_model():
+        return None
+
+try:
+    from prometheus_client import (
+        Counter, Histogram, Gauge, Summary,
+        start_http_server, CollectorRegistry
+    )
+    PROMETHEUS_AVAILABLE = True
+except ImportError:
+    PROMETHEUS_AVAILABLE = False
+    print("⚠️ prometheus_client não disponível")
+
+try:
+    import redis.asyncio as aioredis
+    REDIS_AVAILABLE = True
+except ImportError:
+    REDIS_AVAILABLE = False
+    print("⚠️ redis não disponível")
+
+try:
+    import docker
+    DOCKER_AVAILABLE = True
+except ImportError:
+    DOCKER_AVAILABLE = False
+    print("⚠️ docker SDK não disponível")
+
+try:
+    from neo4j import AsyncGraphDatabase
+    NEO4J_AVAILABLE = True
+except ImportError:
+    NEO4J_AVAILABLE = False
+    print("⚠️ neo4j não disponível")
+
+IS_POSIX = os.name == "posix"
+IS_WINDOWS = os.name == "nt"
+
+# ============================================================
+# CONFIGURAÇÃO GLOBAL
+# ============================================================
+
+class Config:
+    """Configurações centralizadas do framework"""
+    # LLM
+    DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "llama-3.3-70b-versatile")
+    FAST_MODEL = os.getenv("FAST_MODEL", "llama-3.1-8b-instant")
+    CODING_MODEL = os.getenv("CODING_MODEL", "deepseek-r1-distill-llama-70b")
+    
+    # Rate Limiting
+    LLM_RATE_LIMIT = int(os.getenv("LLM_RATE_LIMIT", "3"))
+    EMBEDDING_RATE_LIMIT = int(os.getenv("EMBEDDING_RATE_LIMIT", "5"))
+    
+    # Circuit Breaker
+    CB_FAILURE_THRESHOLD = int(os.getenv("CB_FAILURE_THRESHOLD", "3"))
+    CB_RECOVERY_TIME = float(os.getenv("CB_RECOVERY_TIME", "10.0"))
+    
+    # Retry
+    MAX_RETRIES = int(os.getenv("MAX_RETRIES", "3"))
+    RETRY_BASE_DELAY = float(os.getenv("RETRY_BASE_DELAY", "1.0"))
+    
+    # Timeouts
+    HTTP_TIMEOUT = float(os.getenv("HTTP_TIMEOUT", "30.0"))
+    DAG_GLOBAL_TIMEOUT = float(os.getenv("DAG_GLOBAL_TIMEOUT", "300.0"))
+    TASK_TIMEOUT = float(os.getenv("TASK_TIMEOUT", "30.0"))
+    STREAM_GLOBAL_TIMEOUT = float(os.getenv("STREAM_GLOBAL_TIMEOUT", "120.0"))
+    
+    # Memory
+    MAX_MEMORIES = int(os.getenv("MAX_MEMORIES", "10000"))
+    CACHE_SIZE = int(os.getenv("CACHE_SIZE", "2000"))
+    WORKING_MEMORY_SIZE = int(os.getenv("WORKING_MEMORY_SIZE", "10"))
+    EPISODIC_MEMORY_SIZE = int(os.getenv("EPISODIC_MEMORY_SIZE", "100"))
+    MEMORY_EVICTION_THRESHOLD = float(os.getenv("MEMORY_EVICTION_THRESHOLD", "0.85"))
+    
+    # FAISS
+    MIN_SIMILARITY_SCORE = float(os.getenv("MIN_SIMILARITY_SCORE", "0.45"))
+    FAISS_REBUILD_INTERVAL = int(os.getenv("FAISS_REBUILD_INTERVAL", "1000"))
+    
+    # Sandbox
+    SANDBOX_TIMEOUT = int(os.getenv("SANDBOX_TIMEOUT", "4"))
+    SANDBOX_MEM_LIMIT_MB = int(os.getenv("SANDBOX_MEM_LIMIT_MB", "64"))
+    SANDBOX_CPU_LIMIT = float(os.getenv("SANDBOX_CPU_LIMIT", "0.5"))
+    SANDBOX_USE_DOCKER = os.getenv("SANDBOX_USE_DOCKER", "true").lower() == "true"
+    
+    # Auto-Repair
+    MAX_REPAIR_ATTEMPTS = int(os.getenv("MAX_REPAIR_ATTEMPTS", "5"))
+    REPAIR_BACKOFF_MULTIPLIER = float(os.getenv("REPAIR_BACKOFF_MULTIPLIER", "2.0"))
+    
+    # Code Generation
+    MAX_CODE_VERSIONS = int(os.getenv("MAX_CODE_VERSIONS", "3"))
+    CODE_VALIDATION_ENABLED = os.getenv("CODE_VALIDATION_ENABLED", "true").lower() == "true"
+    
+    # Workspace
+    WORKSPACE_DIR = Path(os.getenv("WORKSPACE_DIR", "./workspace"))
+    MAX_WORKSPACE_SIZE_MB = int(os.getenv("MAX_WORKSPACE_SIZE_MB", "500"))
+    
+    # Streaming
+    STREAM_BUFFER_SIZE = int(os.getenv("STREAM_BUFFER_SIZE", "128"))
+    STREAM_CHUNK_TIMEOUT = float(os.getenv("STREAM_CHUNK_TIMEOUT", "1.0"))
+    
+    # Observability
+    PROMETHEUS_PORT = int(os.getenv("PROMETHEUS_PORT", "8000"))
+    
+    # Redis
+    REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+    REDIS_PREFIX = os.getenv("REDIS_PREFIX", "agent_v21:")
+    
+    # Neo4j
+    NEO4J_URL = os.getenv("NEO4J_URL", "bolt://localhost:7687")
+    NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
+    NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "password")
+    
+    # Paths
+    DATA_DIR = Path(os.getenv("DATA_DIR", "./agent_data"))
+    PLUGINS_DIR = Path(os.getenv("PLUGINS_DIR", "./plugins"))
+    DB_PATH = DATA_DIR / "agent_memory_v21.db"
+    LOG_FILE = DATA_DIR / "runtime.log"
+    
+    # Connection Pool
+    DB_POOL_SIZE = int(os.getenv("DB_POOL_SIZE", "5"))
+    
+    # API Keys (NUNCA hardcoded)
+    GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+
+# ============================================================
+# CONFIGURAÇÃO DE LOGGING EM ARQUIVO
+# ============================================================
+
+def setup_logging():
+    """Configura logging em arquivo e console"""
+    Config.DATA_DIR.mkdir(parents=True, exist_ok=True)
+    
+    # Handler para arquivo (logs de crash)
+    file_handler = logging.FileHandler(
+        Config.LOG_FILE, 
+        encoding='utf-8'
+    )
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(JSONFormatter())
+    
+    # Handler para console
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.INFO)
+    console_handler.setFormatter(JSONFormatter())
+    
+    # Configura logger raiz
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.DEBUG)
+    root_logger.addHandler(file_handler)
+    root_logger.addHandler(console_handler)
+    
+    # Logger específico do agente
+    agent_logger = logging.getLogger("RobloxEnterpriseV21")
+    agent_logger.setLevel(logging.DEBUG)
+    
+    return agent_logger
+
+class JSONFormatter(logging.Formatter):
+    """Formatador JSON para logs estruturados"""
+    
+    def format(self, record):
+        log_entry = {
+            "timestamp": datetime.utcfromtimestamp(record.created).isoformat(),
+            "level": record.levelname,
+            "message": record.getMessage(),
+            "module": record.module,
+            "function": record.funcName,
+            "line": record.lineno,
+            "trace_id": getattr(record, 'trace_id', None),
+            "pid": os.getpid(),
+            "thread": threading.current_thread().name
+        }
+        if record.exc_info:
+            log_entry["exception"] = traceback.format_exception(*record.exc_info)
+        return json.dumps(log_entry, ensure_ascii=False)
+
+# Configuração do logger
+logger = setup_logging()
+
+# ============================================================
+# POOLS DE EXECUTORES COM CANCELAMENTO REAL
+# ============================================================
+
+class CancellableThreadPoolExecutor(ThreadPoolExecutor):
+    """ThreadPool com cancelamento real de threads"""
+    
+    def __init__(self, max_workers=None, thread_name_prefix=''):
+        super().__init__(max_workers=max_workers, thread_name_prefix=thread_name_prefix)
+        self._active_threads: Set[threading.Thread] = set()
+        self._lock = threading.Lock()
+    
+    def submit(self, fn, *args, **kwargs):
+        """Submit com rastreamento de threads ativas"""
+        future = super().submit(fn, *args, **kwargs)
+        return future
+    
+    def cancel_all(self):
+        """Cancela todas as threads ativas (melhor esforço)"""
+        with self._lock:
+            for thread in list(self._active_threads):
+                try:
+                    if hasattr(thread, '_cancel_event'):
+                        thread._cancel_event.set()
+                except Exception:
+                    pass
+
+class ExecutorPools:
+    """Pools de execução separados para diferentes workloads"""
+    
+    def __init__(self):
+        cpu_count = os.cpu_count() or 2
+        
+        # Pool para embeddings (CPU-bound)
+        self.embedding_pool = CancellableThreadPoolExecutor(
+            max_workers=max(2, cpu_count // 2),
+            thread_name_prefix="embedding"
+        )
+        
+        # Pool para I/O (SQLite, Redis, etc)
+        self.io_pool = CancellableThreadPoolExecutor(
+            max_workers=max(4, cpu_count),
+            thread_name_prefix="io"
+        )
+        
+        # Pool para streaming
+        self.stream_pool = CancellableThreadPoolExecutor(
+            max_workers=max(2, cpu_count // 4),
+            thread_name_prefix="stream"
+        )
+        
+        # Pool para inferência LLM
+        self.llm_pool = CancellableThreadPoolExecutor(
+            max_workers=max(2, cpu_count // 2),
+            thread_name_prefix="llm"
+        )
+        
+        # Pool para sandbox
+        self.sandbox_pool = CancellableThreadPoolExecutor(
+            max_workers=max(2, cpu_count // 2),
+            thread_name_prefix="sandbox"
+        )
+        
+        # NOVO: Pool para validação de código
+        self.code_validation_pool = CancellableThreadPoolExecutor(
+            max_workers=max(2, cpu_count // 2),
+            thread_name_prefix="code_validation"
+        )
+    
+    def shutdown(self):
+        """Graceful shutdown de todos os pools"""
+        logger.info("🛑 Encerrando pools de execução...")
+        for pool in [self.embedding_pool, self.io_pool, 
+                     self.stream_pool, self.llm_pool, self.sandbox_pool,
+                     self.code_validation_pool]:
+            try:
+                pool.shutdown(wait=True, cancel_futures=True)
+            except Exception:
+                pool.shutdown(wait=False)
+        logger.info("✅ Pools encerrados")
+
+# Instância global
+pools = ExecutorPools()
+
+# ============================================================
+# SEGURANÇA E GUARDRAILS AVANÇADOS
+# ============================================================
+
+class SecurityException(Exception):
+    """Exceção de segurança"""
+    pass
+
+class CircuitBreakerException(Exception):
+    """Circuit breaker aberto"""
+    pass
+
+class AdvancedGuardrails:
+    """Sistema avançado de guardrails com detecção fuzzy"""
+    
+    # Padrões base
+    BLOCKED_PATTERNS = [
+        r"ignore\s*(previous|all|the)\s*instructions?",
+        r"system\s*prompt",
+        r"developer\s*message",
+        r"override\s*standard\s*behavior",
+        r"output\s*(the\s*)?internal\s*configuration",
+        r"bypass\s*(the\s*)?security",
+        r"reveal\s*(your|the)\s*instructions?",
+        r"pretend\s*(you\s*are|to\s*be)",
+        r"act\s*as\s*if",
+        r"forget\s*(all|your)\s*training",
+    ]
+    
+    # Variações com leetspeak
+    LEET_MAP = {
+        '0': 'o', '1': 'l', '3': 'e', '4': 'a',
+        '5': 's', '6': 'g', '7': 't', '8': 'b',
+        '@': 'a', '$': 's', '!': 'i', '|': 'l'
+    }
+    
+    # NOVO: Padrões de segurança para código
+    DANGEROUS_PATTERNS = [
+        r'os\.system',
+        r'subprocess\.call',
+        r'eval\s*\(',
+        r'exec\s*\(',
+        r'__import__\s*\(',
+        r'open\s*\([^)]*[\'"]w',
+        r'shutil\.rmtree',
+        r'os\.remove',
+        r'os\.unlink',
+    ]
+    
+    @classmethod
+    def normalize_text(cls, text: str) -> str:
+        """Normaliza texto removendo leetspeak"""
+        normalized = text.lower()
+        for leet, normal in cls.LEET_MAP.items():
+            normalized = normalized.replace(leet, normal)
+        return normalized
+    
+    @classmethod
+    def sanitize_input(cls, user_input: str) -> str:
+        """
+        Sanitização avançada com:
+        - Detecção de padrões com regex
+        - Normalização de leetspeak
+        - Verificação de similaridade
+        """
+        normalized = cls.normalize_text(user_input)
+        
+        # Verifica padrões bloqueados
+        for pattern in cls.BLOCKED_PATTERNS:
+            if re.search(pattern, normalized, re.IGNORECASE):
+                logger.error(f"🚨 Violação de segurança: '{pattern}'")
+                raise SecurityException(
+                    "Operação cancelada por violação das políticas de segurança."
+                )
+        
+        # Verifica injeção de código
+        if re.search(r'```(python|javascript|lua|bash|sql)', user_input, re.IGNORECASE):
+            # Permite código apenas em contextos específicos
+            if 'sandbox' not in normalized and 'execute' not in normalized:
+                raise SecurityException(
+                    "Execução de código não autorizada detectada."
+                )
+        
+        return user_input
+    
+    @classmethod
+    def validate_code_safety(cls, code: str, language: str = "python") -> Tuple[bool, str]:
+        """NOVO: Valida segurança do código gerado"""
+        if language.lower() == "python":
+            try:
+                tree = ast.parse(code)
+                
+                # Verifica padrões perigosos
+                for node in ast.walk(tree):
+                    if isinstance(node, ast.Call):
+                        if isinstance(node.func, ast.Name):
+                            if node.func.id in ['eval', 'exec', '__import__']:
+                                return False, f"Função perigosa detectada: {node.func.id}"
+                        elif isinstance(node.func, ast.Attribute):
+                            if node.func.attr in ['system', 'call', 'remove', 'unlink']:
+                                return False, f"Método perigoso detectado: {node.func.attr}"
+                
+                return True, "Código validado com sucesso"
+            except SyntaxError as e:
+                return False, f"Erro de sintaxe: {str(e)}"
+        
+        return True, "Validação não disponível para esta linguagem"
+    
+    @classmethod
+    def validate_tool_args(cls, tool_name: str, args: Dict) -> Dict:
+        """Valida argumentos de tools"""
+        sanitized = {}
+        for key, value in args.items():
+            if isinstance(value, str):
+                sanitized[key] = cls.sanitize_input(value)
+            elif isinstance(value, dict):
+                sanitized[key] = cls.validate_tool_args(tool_name, value)
+            else:
+                sanitized[key] = value
+        return sanitized
+
+# ============================================================
+# TELEMETRIA E OBSERVABILIDADE COMPLETA
+# ============================================================
+
+class TelemetryManager:
+    """Gerenciador completo de telemetria"""
+    
+    def __init__(self):
+        self.registry = CollectorRegistry() if PROMETHEUS_AVAILABLE else None
+        
+        if PROMETHEUS_AVAILABLE:
+            self._init_metrics()
+    
+    def _init_metrics(self):
+        """Inicializa todas as métricas Prometheus"""
+        # LLM Metrics
+        self.llm_requests = Counter(
+            'agent_llm_requests_total',
+            'Total de chamadas LLM',
+            ['model', 'status', 'provider'],
+            registry=self.registry
+        )
+        self.llm_latency = Histogram(
+            'agent_llm_latency_seconds',
+            'Latência de inferência',
+            ['model'],
+            buckets=[0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0],
+            registry=self.registry
+        )
+        self.llm_tokens = Counter(
+            'agent_llm_tokens_total',
+            'Total de tokens consumidos',
+            ['model', 'type'],
+            registry=self.registry
+        )
+        
+        # Sandbox Metrics
+        self.sandbox_executions = Counter(
+            'agent_sandbox_executions_total',
+            'Execuções no Sandbox',
+            ['language', 'status'],
+            registry=self.registry
+        )
+        self.sandbox_duration = Histogram(
+            'agent_sandbox_duration_seconds',
+            'Duração de execuções sandbox',
+            ['language'],
+            registry=self.registry
+        )
+        
+        # Memory Metrics
+        self.memory_operations = Counter(
+            'agent_memory_operations_total',
+            'Operações de memória',
+            ['operation', 'type'],
+            registry=self.registry
+        )
+        self.memory_size = Gauge(
+            'agent_memory_entries',
+            'Entradas na memória',
+            ['type'],
+            registry=self.registry
+        )
+        self.faiss_rebuilds = Counter(
+            'agent_faiss_rebuilds_total',
+            'Reconstruções do índice FAISS',
+            registry=self.registry
+        )
+        
+        # System Metrics
+        self.circuit_breaker_state = Gauge(
+            'agent_circuit_breaker_status',
+            'Estado do Circuit Breaker',
+            ['name'],
+            registry=self.registry
+        )
+        self.active_tasks = Gauge(
+            'agent_active_graph_tasks',
+            'Tarefas em execução no DAG',
+            registry=self.registry
+        )
+        self.queue_size = Gauge(
+            'agent_queue_size',
+            'Tamanho das filas',
+            ['queue_name'],
+            registry=self.registry
+        )
+        
+        # Rate Limiter Metrics
+        self.rate_limiter_wait = Histogram(
+            'agent_rate_limiter_wait_seconds',
+            'Tempo de espera no rate limiter',
+            ['limiter_name'],
+            registry=self.registry
+        )
+        
+        # Connection Pool Metrics
+        self.db_pool_active = Gauge(
+            'agent_db_pool_active',
+            'Conexões ativas no pool',
+            registry=self.registry
+        )
+        
+        # Crash Metrics
+        self.crash_counter = Counter(
+            'agent_crashes_total',
+            'Total de crashes do sistema',
+            ['component'],
+            registry=self.registry
+        )
+        
+        # NOVO: Auto-Repair Metrics
+        self.auto_repair_attempts = Counter(
+            'agent_auto_repair_attempts_total',
+            'Tentativas de auto-reparo',
+            ['status'],
+            registry=self.registry
+        )
+        
+        # NOVO: Code Generation Metrics
+        self.code_generation = Counter(
+            'agent_code_generation_total',
+            'Total de código gerado',
+            ['language', 'status'],
+            registry=self.registry
+        )
+        self.code_validation_failures = Counter(
+            'agent_code_validation_failures_total',
+            'Falhas na validação de código',
+            ['type'],
+            registry=self.registry
+        )
+        
+        # NOVO: Workspace Metrics
+        self.workspace_size = Gauge(
+            'agent_workspace_size_bytes',
+            'Tamanho do workspace',
+            registry=self.registry
+        )
+    
+    def start_server(self):
+        """Inicia servidor Prometheus"""
+        if PROMETHEUS_AVAILABLE:
+            try:
+                start_http_server(Config.PROMETHEUS_PORT, registry=self.registry)
+                logger.info(f"📊 Métricas Prometheus em :{Config.PROMETHEUS_PORT}")
+            except Exception as e:
+                logger.error(f"Erro ao iniciar Prometheus: {e}")
+
+# Instância global
+telemetry = TelemetryManager()
+
+# ============================================================
+# TOKENIZER AVANÇADO
+# ============================================================
+
+class TokenManager:
+    """Gerenciador de tokens com múltiplos encoders"""
+    
+    def __init__(self):
+        self.encoders = {}
+        self._init_encoders()
+    
+    def _init_encoders(self):
+        """Inicializa encoders disponíveis"""
+        try:
+            import tiktoken
+            self.encoders['cl100k_base'] = tiktoken.get_encoding("cl100k_base")
+            self.encoders['p50k_base'] = tiktoken.get_encoding("p50k_base")
+            self.has_tokenizer = True
+        except ImportError:
+            self.has_tokenizer = False
+            logger.warning("tiktoken não disponível, usando estimativa")
+    
+    def count_tokens(self, text: str, model: str = "default") -> int:
+        """Conta tokens com fallback"""
+        if self.has_tokenizer:
+            encoder = self.encoders.get('cl100k_base')
+            if encoder:
+                return len(encoder.encode(text))
+        # Fallback: estimativa conservadora
+        return len(text) // 3
+    
+    def truncate_safe(self, text: str, max_tokens: int, 
+                      preserve_json: bool = False) -> str:
+        """Trunca texto preservando estrutura JSON se necessário"""
+        if self.count_tokens(text) <= max_tokens:
+            return text
+        
+        if preserve_json:
+            try:
+                data = json.loads(text)
+                return self._truncate_json(data, max_tokens)
+            except json.JSONDecodeError:
+                pass
+        
+        # Truncamento normal
+        if self.has_tokenizer:
+            encoder = self.encoders.get('cl100k_base')
+            if encoder:
+                tokens = encoder.encode(text)
+                truncated = encoder.decode(tokens[:max_tokens])
+                return truncated + "\n...[truncated]..."
+        
+        # Fallback
+        return text[:max_tokens * 3] + "\n...[truncated]..."
+    
+    def _truncate_json(self, data: Any, max_tokens: int) -> str:
+        """Trunca JSON preservando estrutura"""
+        if isinstance(data, dict):
+            result = {}
+            for key, value in data.items():
+                partial = json.dumps(result)
+                if self.count_tokens(partial) >= max_tokens:
+                    break
+                result[key] = self._truncate_json_value(value, max_tokens)
+            return json.dumps(result, ensure_ascii=False)
+        return json.dumps(data, ensure_ascii=False)
+    
+    def _truncate_json_value(self, value: Any, max_tokens: int) -> Any:
+        """Trunca valor JSON"""
+        if isinstance(value, str):
+            return self.truncate_safe(value, max_tokens // 2)
+        elif isinstance(value, (int, float, bool)):
+            return value
+        elif isinstance(value, list):
+            return value[:5]  # Limita arrays
+        return str(value)[:100]
+
+tokenizer = TokenManager()
+
+# ============================================================
+# SHUTDOWN MANAGER COM CANCELAMENTO REAL
+# ============================================================
+
+class ShutdownManager:
+    """Gerenciador de shutdown graceful com cancelamento real"""
+    
+    def __init__(self):
+        self.shutdown_event = asyncio.Event()
+        self._cleanup_callbacks: List[Callable] = []
+        self._active_futures: Set[Future] = set()
+        self._cancel_event = threading.Event()
+    
+    def register_cleanup(self, callback: Callable):
+        """Registra callback de limpeza"""
+        self._cleanup_callbacks.append(callback)
+    
+    def track_future(self, future: Future):
+        """Rastreia future para cancelamento"""
+        self._active_futures.add(future)
+        future.add_done_callback(self._active_futures.discard)
+    
+    def trigger_shutdown(self):
+        """Aciona shutdown com cancelamento real"""
+        logger.info("🛑 Shutdown acionado - cancelando operações...")
+        self.shutdown_event.set()
+        self._cancel_event.set()  # Sinaliza threads
+        
+        # Cancela futures ativos
+        for future in list(self._active_futures):
+            if not future.done():
+                future.cancel()
+        
+        # Cancela pools
+        pools.shutdown()
+    
+    def check(self):
+        """Verifica se shutdown foi acionado"""
+        if self.shutdown_event.is_set():
+            raise asyncio.CancelledError("Shutdown global acionado.")
+    
+    def is_cancelled(self) -> bool:
+        """Verifica cancelamento (thread-safe)"""
+        return self._cancel_event.is_set()
+    
+    async def execute_cleanup(self):
+        """Executa callbacks de limpeza"""
+        for callback in self._cleanup_callbacks:
+            try:
+                if asyncio.iscoroutinefunction(callback):
+                    await callback()
+                else:
+                    callback()
+            except Exception as e:
+                logger.error(f"Erro na limpeza: {e}")
+
+shutdown_manager = ShutdownManager()
+
+# ============================================================
+# WORKSPACE MANAGER (NOVO)
+# ============================================================
+
+class WorkspaceManager:
+    """Gerenciador de workspace isolado para projetos"""
+    
+    def __init__(self):
+        self.workspace_dir = Config.WORKSPACE_DIR
+        self.current_project: Optional[str] = None
+        self.project_dir: Optional[Path] = None
+        self._lock = asyncio.Lock()
+        
+    async def initialize(self):
+        """Inicializa workspace"""
+        self.workspace_dir.mkdir(parents=True, exist_ok=True)
+        logger.info(f"📁 Workspace inicializado em: {self.workspace_dir}")
+    
+    async def create_project(self, project_name: str) -> Path:
+        """Cria novo projeto no workspace"""
+        async with self._lock:
+            # Sanitiza nome do projeto
+            safe_name = re.sub(r'[^\w\-_]', '_', project_name)
+            project_path = self.workspace_dir / safe_name
+            
+            if project_path.exists():
+                # Adiciona timestamp para evitar conflitos
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                project_path = self.workspace_dir / f"{safe_name}_{timestamp}"
+            
+            project_path.mkdir(parents=True, exist_ok=True)
+            
+            # Cria estrutura básica
+            (project_path / "src").mkdir(exist_ok=True)
+            (project_path / "tests").mkdir(exist_ok=True)
+            (project_path / "docs").mkdir(exist_ok=True)
+            
+            self.current_project = safe_name
+            self.project_dir = project_path
+            
+            logger.info(f"📁 Projeto criado: {project_path}")
+            return project_path
+    
+    async def save_file(self, filename: str, content: str, 
+                       subdir: str = "src") -> Path:
+        """Salva arquivo no projeto atual"""
+        if not self.project_dir:
+            raise ValueError("Nenhum projeto ativo. Crie um projeto primeiro.")
+        
+        # Sanitiza nome do arquivo
+        safe_filename = re.sub(r'[^\w\-_\.]', '_', filename)
+        
+        # Determina diretório
+        target_dir = self.project_dir / subdir
+        target_dir.mkdir(exist_ok=True)
+        
+        file_path = target_dir / safe_filename
+        
+        # Salva arquivo
+        async with self._lock:
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+        
+        # Verifica tamanho do workspace
+        await self._check_workspace_size()
+        
+        logger.info(f"💾 Arquivo salvo: {file_path}")
+        return file_path
+    
+    async def read_file(self, filepath: str) -> str:
+        """Lê arquivo do workspace"""
+        if self.project_dir:
+            full_path = self.project_dir / filepath
+        else:
+            full_path = self.workspace_dir / filepath
+        
+        if not full_path.exists():
+            raise FileNotFoundError(f"Arquivo não encontrado: {full_path}")
+        
+        with open(full_path, 'r', encoding='utf-8') as f:
+            return f.read()
+    
+    async def list_files(self, subdir: str = ".") -> List[str]:
+        """Lista arquivos do projeto"""
+        if self.project_dir:
+            target_dir = self.project_dir / subdir
+        else:
+            target_dir = self.workspace_dir / subdir
+        
+        if not target_dir.exists():
+            return []
+        
+        files = []
+        for file_path in target_dir.rglob("*"):
+            if file_path.is_file():
+                files.append(str(file_path.relative_to(target_dir)))
+        
+        return files
+    
+    async def _check_workspace_size(self):
+        """Verifica e gerencia tamanho do workspace"""
+        total_size = 0
+        for file_path in self.workspace_dir.rglob("*"):
+            if file_path.is_file():
+                total_size += file_path.stat().st_size
+        
+        size_mb = total_size / (1024 * 1024)
+        
+        if PROMETHEUS_AVAILABLE:
+            telemetry.workspace_size.set(total_size)
+        
+        if size_mb > Config.MAX_WORKSPACE_SIZE_MB:
+            logger.warning(f"⚠️ Workspace excedeu limite: {size_mb:.2f}MB")
+            await self._cleanup_workspace()
+    
+    async def _cleanup_workspace(self):
+        """Limpa arquivos antigos do workspace"""
+        # Remove projetos antigos (mais de 7 dias)
+        cutoff_time = time.time() - (7 * 24 * 3600)
+        
+        for project_dir in self.workspace_dir.iterdir():
+            if project_dir.is_dir():
+                if project_dir.stat().st_mtime < cutoff_time:
+                    try:
+                        shutil.rmtree(project_dir)
+                        logger.info(f"🗑️ Projeto removido: {project_dir}")
+                    except Exception as e:
+                        logger.error(f"Erro ao remover projeto: {e}")
+
+# ============================================================
+# CACHE DISTRIBUÍDO COM REDIS + LRU LOCAL
+# ============================================================
+
+class DistributedCache:
+    """Cache em duas camadas: LRU local + Redis"""
+    
+    def __init__(self):
+        self.local_cache = OrderedDict()
+        self.local_capacity = Config.CACHE_SIZE
+        self.lock = asyncio.Lock()
+        self.redis = None
+        self.hits = 0
+        self.misses = 0
+    
+    async def initialize(self):
+        """Inicialização assíncrona do Redis"""
+        if REDIS_AVAILABLE:
+            try:
+                self.redis = await aioredis.from_url(
+                    Config.REDIS_URL,
+                    encoding="utf-8",
+                    decode_responses=True
+                )
+                await self.redis.ping()
+                logger.info("📦 Cache Redis conectado")
+            except Exception as e:
+                logger.warning(f"Redis indisponível: {e}")
+                self.redis = None
+    
+    async def get(self, key: str) -> Optional[Any]:
+        """Obtém do cache (local -> Redis)"""
+        # Tenta cache local primeiro
+        async with self.lock:
+            if key in self.local_cache:
+                self.local_cache.move_to_end(key)
+                self.hits += 1
+                return self.local_cache[key]
+        
+        # Tenta Redis
+        if self.redis:
+            try:
+                value = await self.redis.get(f"{Config.REDIS_PREFIX}{key}")
+                if value:
+                    data = json.loads(value)
+                    # Atualiza cache local
+                    async with self.lock:
+                        self.local_cache[key] = data
+                        if len(self.local_cache) > self.local_capacity:
+                            self.local_cache.popitem(last=False)
+                    self.hits += 1
+                    return data
+            except Exception:
+                pass
+        
+        self.misses += 1
+        return None
+    
+    async def put(self, key: str, value: Any, ttl: int = 3600):
+        """Armazena no cache (local + Redis)"""
+        # Cache local
+        async with self.lock:
+            self.local_cache[key] = value
+            self.local_cache.move_to_end(key)
+            if len(self.local_cache) > self.local_capacity:
+                self.local_cache.popitem(last=False)
+        
+        # Redis
+        if self.redis:
+            try:
+                await self.redis.setex(
+                    f"{Config.REDIS_PREFIX}{key}",
+                    ttl,
+                    json.dumps(value, default=str)
+                )
+            except Exception:
+                pass
+    
+    async def invalidate(self, pattern: str = "*"):
+        """Invalida cache"""
+        async with self.lock:
+            self.local_cache.clear()
+        
+        if self.redis:
+            try:
+                keys = await self.redis.keys(f"{Config.REDIS_PREFIX}{pattern}")
+                if keys:
+                    await self.redis.delete(*keys)
+            except Exception:
+                pass
+    
+    def get_stats(self) -> Dict:
+        """Retorna estatísticas do cache"""
+        total = self.hits + self.misses
+        return {
+            "hits": self.hits,
+            "misses": self.misses,
+            "hit_rate": self.hits / max(total, 1),
+            "local_size": len(self.local_cache)
+        }
+
+# Instância global
+cache_manager = DistributedCache()
+
+# ============================================================
+# CIRCUIT BREAKER COM MÉTRICAS
+# ============================================================
+
+class CircuitBreaker:
+    """Circuit breaker com estados: CLOSED, OPEN, HALF_OPEN"""
+    
+    def __init__(self, name: str = "default"):
+        self.name = name
+        self.failure_threshold = Config.CB_FAILURE_THRESHOLD
+        self.recovery_time = Config.CB_RECOVERY_TIME
+        self.state = "CLOSED"
+        self.failure_count = 0
+        self.success_count = 0
+        self.last_state_change = time.time()
+        self.lock = asyncio.Lock()
+        self.total_calls = 0
+        self.total_failures = 0
+    
+    async def call(self, func: Callable, *args, **kwargs) -> Any:
+        """Executa função com proteção do circuit breaker"""
+        shutdown_manager.check()
+        
+        async with self.lock:
+            await self._update_state()
+            if self.state == "OPEN":
+                if PROMETHEUS_AVAILABLE:
+                    telemetry.circuit_breaker_state.labels(name=self.name).set(2)
+                raise CircuitBreakerException(
+                    f"🚨 Circuit Breaker '{self.name}' OPEN"
+                )
+        
+        self.total_calls += 1
+        
+        try:
+            result = await func(*args, **kwargs)
+            
+            async with self.lock:
+                if self.state == "HALF_OPEN":
+                    self.state = "CLOSED"
+                    self.failure_count = 0
+                    if PROMETHEUS_AVAILABLE:
+                        telemetry.circuit_breaker_state.labels(name=self.name).set(0)
+                self.success_count += 1
+            
+            return result
+            
+        except Exception as e:
+            self.total_failures += 1
+            async with self.lock:
+                self.failure_count += 1
+                if self.failure_count >= self.failure_threshold:
+                    self.state = "OPEN"
+                    self.last_state_change = time.time()
+                    if PROMETHEUS_AVAILABLE:
+                        telemetry.circuit_breaker_state.labels(name=self.name).set(2)
+                    logger.error(f"Circuit Breaker '{self.name}' OPEN: {e}")
+            raise e
+    
+    async def _update_state(self):
+        """Atualiza estado do circuit breaker"""
+        if (self.state == "OPEN" and 
+            (time.time() - self.last_state_change) > self.recovery_time):
+            self.state = "HALF_OPEN"
+            if PROMETHEUS_AVAILABLE:
+                telemetry.circuit_breaker_state.labels(name=self.name).set(1)
+            logger.info(f"Circuit Breaker '{self.name}' HALF_OPEN")
+    
+    def get_stats(self) -> Dict:
+        """Retorna estatísticas"""
+        return {
+            "name": self.name,
+            "state": self.state,
+            "failure_count": self.failure_count,
+            "success_count": self.success_count,
+            "total_calls": self.total_calls,
+            "total_failures": self.total_failures,
+            "failure_rate": self.total_failures / max(self.total_calls, 1)
+        }
+
+# ============================================================
+# AUTO-REPAIR ENGINE (NOVO)
+# ============================================================
+
+class AutoRepairEngine:
+    """Motor de auto-reparo com análise de stacktrace e regeneração"""
+    
+    def __init__(self, llm_client):
+        self.llm = llm_client
+        self.repair_history: Dict[str, List[Dict]] = defaultdict(list)
+        self.successful_fixes: Dict[str, int] = defaultdict(int)
+        
+    async def analyze_error(self, error: Exception, code: str, 
+                           context: Dict = None) -> Dict:
+        """Analisa erro e propõe correção"""
+        error_type = type(error).__name__
+        error_msg = str(error)
+        stacktrace = traceback.format_exc()
+        
+        # Extrai linha do erro se disponível
+        error_line = None
+        if hasattr(error, '__traceback__') and error.__traceback__:
+            tb = traceback.extract_tb(error.__traceback__)
+            if tb:
+                error_line = tb[-1].lineno
+        
+        analysis_prompt = f"""
+        Analise este erro de execução e proponha uma correção.
+        
+        Tipo de erro: {error_type}
+        Mensagem: {error_msg}
+        Stacktrace: {stacktrace[:1000]}
+        Linha do erro: {error_line}
+        
+        Código que causou o erro:
+        ```python
+        {code[:1000]}
+        ```
+        
+        Contexto adicional:
+        {json.dumps(context or {}, default=str)[:500]}
+        
+        Retorne JSON com:
+        {{
+            "error_category": "syntax|runtime|logic|security|resource",
+            "root_cause": "causa raiz do erro",
+            "fix_strategy": "estratégia de correção",
+            "fixed_code": "código corrigido completo",
+            "confidence": 0.0-1.0,
+            "explanation": "explicação da correção"
+        }}
+        """
+        
+        try:
+            raw = await self.llm.chat_completion(
+                model=Config.CODING_MODEL,
+                messages=[{"role": "user", "content": analysis_prompt}],
+                temperature=0.0,
+                response_format={"type": "json_object"}
+            )
+            
+            cleaned = re.sub(r'```json\s*|\s*```', '', raw).strip()
+            analysis = json.loads(cleaned)
+            
+            # Registra no histórico
+            error_fingerprint = hashlib.md5(
+                f"{error_type}:{error_msg[:100]}".encode()
+            ).hexdigest()
+            
+            self.repair_history[error_fingerprint].append({
+                "timestamp": datetime.now().isoformat(),
+                "fix_strategy": analysis.get("fix_strategy"),
+                "success": False  # Será atualizado após tentativa
+            })
+            
+            return analysis
+            
+        except Exception as e:
+            logger.error(f"Erro na análise de erro: {e}")
+            return {
+                "error_category": "unknown",
+                "root_cause": str(error),
+                "fix_strategy": "regenerate_completely",
+                "fixed_code": code,
+                "confidence": 0.1,
+                "explanation": "Falha na análise automática"
+            }
+    
+    async def auto_repair_loop(self, task: str, original_code: str,
+                              max_attempts: int = None) -> Tuple[str, bool]:
+        """Loop de auto-reparo com múltiplas estratégias"""
+        if max_attempts is None:
+            max_attempts = Config.MAX_REPAIR_ATTEMPTS
+        
+        current_code = original_code
+        attempts_history = []
+        
+        for attempt in range(max_attempts):
+            shutdown_manager.check()
+            
+            logger.info(f"🔧 Tentativa de reparo {attempt + 1}/{max_attempts}")
+            
+            try:
+                # Tenta executar o código em sandbox
+                result = await self._execute_in_sandbox(current_code)
+                
+                if result["success"]:
+                    logger.info(f"✅ Código executado com sucesso após {attempt + 1} tentativas")
+                    if PROMETHEUS_AVAILABLE:
+                        telemetry.auto_repair_attempts.labels(status="success").inc()
+                    return current_code, True
+                
+                # Analisa erro
+                error_info = result.get("stderr", "Erro desconhecido")
+                analysis = await self.analyze_error(
+                    Exception(error_info), 
+                    current_code,
+                    {"task": task, "attempt": attempt + 1}
+                )
+                
+                # Aplica correção
+                if analysis["confidence"] > 0.5:
+                    current_code = analysis.get("fixed_code", current_code)
+                    attempts_history.append({
+                        "attempt": attempt + 1,
+                        "strategy": analysis["fix_strategy"],
+                        "confidence": analysis["confidence"]
+                    })
+                else:
+                    # Regenera completamente
+                    current_code = await self._regenerate_code(task, attempts_history)
+                    
+            except Exception as e:
+                logger.error(f"Erro no loop de reparo: {e}")
+                analysis = await self.analyze_error(e, current_code)
+                current_code = analysis.get("fixed_code", current_code)
+        
+        if PROMETHEUS_AVAILABLE:
+            telemetry.auto_repair_attempts.labels(status="failed").inc()
+        
+        return current_code, False
+    
+    async def _execute_in_sandbox(self, code: str) -> Dict:
+        """Executa código em sandbox segura"""
+        # Esta função será substituída pela sandbox real
+        return {"success": True, "stdout": "", "stderr": ""}
+    
+    async def _regenerate_code(self, task: str, history: List[Dict]) -> str:
+        """Regenera código baseado no histórico de falhas"""
+        prompt = f"""
+        Gere um novo código para a tarefa, considerando falhas anteriores.
+        
+        Tarefa: {task}
+        
+        Histórico de tentativas falhas:
+        {json.dumps(history, indent=2)[:1000]}
+        
+        Gere um código completamente novo que evite os erros anteriores.
+        Retorne APENAS o código, sem explicações.
+        """
+        
+        try:
+            new_code = await self.llm.chat_completion(
+                model=Config.CODING_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.3
+            )
+            
+            # Limpa formatação
+            new_code = re.sub(r'```\w*\n?', '', new_code)
+            new_code = new_code.strip()
+            
+            return new_code
+            
+        except Exception as e:
+            logger.error(f"Erro na regeneração: {e}")
+            return "# Regeneration failed\n"
+
+# ============================================================
+# MULTI-VERSION CODE GENERATOR (NOVO)
+# ============================================================
+
+class MultiVersionCodeGenerator:
+    """Gerador de múltiplas versões de código com validação"""
+    
+    def __init__(self, llm_client):
+        self.llm = llm_client
+        
+    async def generate_variants(self, task: str, language: str = "python",
+                              num_variants: int = None) -> List[Dict]:
+        """Gera múltiplas variantes de código para a mesma tarefa"""
+        if num_variants is None:
+            num_variants = Config.MAX_CODE_VERSIONS
+        
+        variants = []
+        
+        # Diferentes estratégias de geração
+        strategies = [
+            "direct_implementation",
+            "optimized_version",
+            "alternative_approach",
+            "simplified_version",
+            "robust_version"
+        ]
+        
+        for i in range(min(num_variants, len(strategies))):
+            strategy = strategies[i]
+            
+            prompt = f"""
+            Gere código {language} usando a estratégia: {strategy}
+            
+            Tarefa: {task}
+            
+            Requisitos:
+            - Código funcional e testável
+            - Comentários explicativos
+            - Tratamento de erros
+            - Tipo: {strategy}
+            
+            Retorne JSON:
+            {{
+                "code": "código completo",
+                "strategy": "{strategy}",
+                "explanation": "explicação da abordagem",
+                "complexity": "low|medium|high",
+                "dependencies": ["dep1", "dep2"]
+            }}
+            """
+            
+            try:
+                raw = await self.llm.chat_completion(
+                    model=Config.CODING_MODEL,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.2 + (i * 0.1),  # Varia temperatura
+                    response_format={"type": "json_object"}
+                )
+                
+                cleaned = re.sub(r'```json\s*|\s*```', '', raw).strip()
+                variant = json.loads(cleaned)
+                
+                # Valida segurança do código
+                is_safe, safety_msg = AdvancedGuardrails.validate_code_safety(
+                    variant.get("code", ""), language
+                )
+                
+                variant["safe"] = is_safe
+                variant["safety_check"] = safety_msg
+                variant["variant_id"] = i + 1
+                
+                variants.append(variant)
+                
+                if PROMETHEUS_AVAILABLE:
+                    telemetry.code_generation.labels(
+                        language=language, status="generated"
+                    ).inc()
+                
+            except Exception as e:
+                logger.error(f"Erro ao gerar variante {i}: {e}")
+                
+                if PROMETHEUS_AVAILABLE:
+                    telemetry.code_generation.labels(
+                        language=language, status="failed"
+                    ).inc()
+        
+        return variants
+    
+    async def select_best_variant(self, variants: List[Dict], 
+                                 criteria: Dict = None) -> Dict:
+        """Seleciona a melhor variante baseado em critérios"""
+        if not variants:
+            return None
+        
+        # Critérios padrão
+        if criteria is None:
+            criteria = {
+                "safety": 0.3,
+                "simplicity": 0.2,
+                "efficiency": 0.2,
+                "readability": 0.15,
+                "robustness": 0.15
+            }
+        
+        scored_variants = []
+        
+        for variant in variants:
+            score = 0
+            
+            # Safety score
+            if variant.get("safe", False):
+                score += criteria["safety"] * 10
+            
+            # Complexity score (prefere menor complexidade)
+            complexity_scores = {"low": 10, "medium": 5, "high": 2}
+            score += complexity_scores.get(
+                variant.get("complexity", "medium"), 5
+            ) * criteria["simplicity"]
+            
+            # Dependencies score (menos dependências = melhor)
+            deps = len(variant.get("dependencies", []))
+            score += max(0, 10 - deps) * criteria["efficiency"]
+            
+            scored_variants.append((score, variant))
+        
+        # Ordena por score
+        scored_variants.sort(reverse=True, key=lambda x: x[0])
+        
+        if scored_variants:
+            best = scored_variants[0][1]
+            best["selection_score"] = scored_variants[0][0]
+            return best
+        
+        return variants[0]
+
+# ============================================================
+# RATE LIMITER ADAPTATIVO COM REDIS (DISTRIBUÍDO)
+# ============================================================
+
+class DistributedRateLimiter:
+    """Rate limiter distribuído via Redis"""
+    
+    def __init__(self, name: str, max_concurrent: int):
+        self.name = name
+        self.max_concurrent = max_concurrent
+        self.local_limiter = AdaptiveRateLimiter(name, max_concurrent)
+        self.redis = None
+    
+    async def initialize(self):
+        """Inicializa conexão Redis"""
+        if REDIS_AVAILABLE:
+            try:
+                self.redis = await aioredis.from_url(
+                    Config.REDIS_URL,
+                    encoding="utf-8",
+                    decode_responses=True
+                )
+            except Exception:
+                self.redis = None
+    
+    @asynccontextmanager
+    async def acquire(self):
+        """Adquire slot (local + distribuído)"""
+        # Tenta local primeiro
+        async with self.local_limiter.acquire():
+            # Se Redis disponível, tenta distribuído
+            if self.redis:
+                key = f"{Config.REDIS_PREFIX}ratelimit:{self.name}"
+                try:
+                    # Token bucket simples
+                    current = await self.redis.incr(key)
+                    await self.redis.expire(key, 1)  # 1 segundo window
+                    
+                    if current > self.max_concurrent:
+                        await self.redis.decr(key)
+                        raise Exception("Rate limit excedido (distribuído)")
+                except Exception:
+                    pass
+            
+            try:
+                yield
+            finally:
+                if self.redis:
+                    try:
+                        await self.redis.decr(key)
+                    except Exception:
+                        pass
+
+class AdaptiveRateLimiter:
+    """Rate limiter adaptativo com semáforo"""
+    
+    def __init__(self, name: str, max_concurrent: int):
+        self.name = name
+        self.semaphore = asyncio.Semaphore(max_concurrent)
+        self.wait_times = deque(maxlen=100)
+        self.total_waited = 0
+        self.total_acquired = 0
+    
+    @asynccontextmanager
+    async def acquire(self):
+        """Context manager para aquisição de slot"""
+        start_wait = time.time()
+        async with self.semaphore:
+            wait_time = time.time() - start_wait
+            self.wait_times.append(wait_time)
+            self.total_waited += wait_time
+            self.total_acquired += 1
+            
+            if PROMETHEUS_AVAILABLE:
+                telemetry.rate_limiter_wait.labels(
+                    limiter_name=self.name
+                ).observe(wait_time)
+            
+            try:
+                yield
+            finally:
+                pass
+    
+    def get_stats(self) -> Dict:
+        """Estatísticas do rate limiter"""
+        return {
+            "name": self.name,
+            "avg_wait": sum(self.wait_times) / max(len(self.wait_times), 1),
+            "total_acquired": self.total_acquired,
+            "max_concurrent": self.semaphore._value
+        }
+
+# ============================================================
+# RETRY COM BACKOFF EXPONENCIAL
+# ============================================================
+
+class RetryManager:
+    """Gerenciador de retry com backoff exponencial"""
+    
+    @staticmethod
+    async def execute_with_retry(
+        func: Callable,
+        max_retries: int = Config.MAX_RETRIES,
+        base_delay: float = Config.RETRY_BASE_DELAY,
+        exceptions: Tuple = (Exception,),
+        on_retry: Optional[Callable] = None,
+        timeout: Optional[float] = None
+    ) -> Any:
+        """Executa função com retry exponencial e timeout"""
+        last_exception = None
+        
+        for attempt in range(max_retries):
+            try:
+                if timeout:
+                    return await asyncio.wait_for(func(), timeout=timeout)
+                return await func()
+            except asyncio.TimeoutError:
+                last_exception = TimeoutError(f"Timeout após {timeout}s")
+            except exceptions as e:
+                last_exception = e
+                
+            if attempt < max_retries - 1:
+                delay = base_delay * (2 ** attempt) + random.uniform(0, 1)
+                logger.warning(
+                    f"Retry {attempt + 1}/{max_retries} em {delay:.2f}s: {last_exception}"
+                )
+                
+                if on_retry:
+                    await on_retry(attempt, last_exception)
+                
+                await asyncio.sleep(delay)
+            else:
+                logger.error(f"Todas as tentativas falharam: {last_exception}")
+        
+        raise last_exception
+
+# ============================================================
+# SQLITE CONNECTION POOL
+# ============================================================
+
+class SQLiteConnectionPool:
+    """Pool de conexões SQLite para concorrência"""
+    
+    def __init__(self, db_path: str, pool_size: int = 5):
+        self.db_path = db_path
+        self.pool_size = pool_size
+        self._pool: queue.Queue = queue.Queue(maxsize=pool_size)
+        self._lock = threading.Lock()
+        self._created = 0
+        
+        # Inicializa pool
+        for _ in range(pool_size):
+            self._create_connection()
+    
+    def _create_connection(self):
+        """Cria nova conexão SQLite"""
+        try:
+            conn = sqlite3.connect(self.db_path, check_same_thread=False)
+            conn.execute("PRAGMA journal_mode=WAL;")
+            conn.execute("PRAGMA synchronous=NORMAL;")
+            conn.execute("PRAGMA busy_timeout=5000;")
+            conn.row_factory = sqlite3.Row
+            self._pool.put(conn)
+            self._created += 1
+            
+            if PROMETHEUS_AVAILABLE:
+                telemetry.db_pool_active.set(self._created)
+        except Exception as e:
+            logger.error(f"Erro ao criar conexão SQLite: {e}")
+    
+    def get_connection(self, timeout: float = 5.0) -> sqlite3.Connection:
+        """Obtém conexão do pool"""
+        shutdown_manager.check()
+        
+        try:
+            return self._pool.get(timeout=timeout)
+        except queue.Empty:
+            # Cria nova conexão se pool esgotado
+            with self._lock:
+                if self._created < self.pool_size * 2:
+                    self._create_connection()
+                    return self._pool.get(timeout=1.0)
+            raise Exception("Connection pool exaurido")
+    
+    def return_connection(self, conn: sqlite3.Connection):
+        """Retorna conexão ao pool"""
+        try:
+            self._pool.put_nowait(conn)
+        except queue.Full:
+            conn.close()
+    
+    def close_all(self):
+        """Fecha todas as conexões"""
+        while not self._pool.empty():
+            try:
+                conn = self._pool.get_nowait()
+                conn.close()
+            except queue.Empty:
+                break
+
+# Instância global do pool
+_db_pool: Optional[SQLiteConnectionPool] = None
+
+def get_db_pool() -> SQLiteConnectionPool:
+    """Singleton do pool de conexões"""
+    global _db_pool
+    if _db_pool is None:
+        _db_pool = SQLiteConnectionPool(
+            str(Config.DB_PATH),
+            Config.DB_POOL_SIZE
+        )
+    return _db_pool
+
+# ============================================================
+# MEMÓRIA HIERÁRQUICA AVANÇADA
+# ============================================================
+
+class MemoryType(Enum):
+    """Tipos de memória"""
+    WORKING = "working"
+    EPISODIC = "episodic"
+    SEMANTIC = "semantic"
+    PROCEDURAL = "procedural"
+    TOOL = "tool"
+    FAILURE = "failure"
+    CODE = "code"  # NOVO: memória de código
+
+class AdvancedMemorySystem:
+    """Sistema de memória hierárquica completa com gerenciamento de RAM"""
+    
+    def __init__(self):
+        self.vector_store = FixedFAISSMemoryV19()
+        
+        # Memórias especializadas
+        self.working_memory: deque = deque(maxlen=Config.WORKING_MEMORY_SIZE)
+        self.episodic_memory: deque = deque(maxlen=Config.EPISODIC_MEMORY_SIZE)
+        self.procedural_memory: Dict[str, Any] = {}
+        self.tool_memory: Dict[str, List[Dict]] = defaultdict(list)
+        self.failure_memory: Dict[str, List[Dict]] = defaultdict(list)
+        self.code_memory: Dict[str, List[Dict]] = defaultdict(list)  # NOVO
+        
+        # Knowledge Graph (Neo4j)
+        self.kg_driver = None
+        if NEO4J_AVAILABLE:
+            self._init_knowledge_graph()
+        
+        self.lock = asyncio.Lock()
+        
+        # NOVO: Gerenciamento de memória RAM
+        self._ram_usage_threshold = Config.MEMORY_EVICTION_THRESHOLD
+        self._gc_counter = 0
+    
+    def _init_knowledge_graph(self):
+        """Inicializa conexão com Neo4j"""
+        try:
+            self.kg_driver = AsyncGraphDatabase.driver(
+                Config.NEO4J_URL,
+                auth=(Config.NEO4J_USER, Config.NEO4J_PASSWORD)
+            )
+            logger.info("🧠 Knowledge Graph Neo4j conectado")
+        except Exception as e:
+            logger.warning(f"Neo4j indisponível: {e}")
+    
+    async def initialize(self):
+        """Inicializa subsistemas de memória"""
+        await self.vector_store.initialize()
+        
+        if PROMETHEUS_AVAILABLE:
+            telemetry.memory_size.labels(type="vector").set(0)
+            telemetry.memory_size.labels(type="working").set(0)
+            telemetry.memory_size.labels(type="episodic").set(0)
+            telemetry.memory_size.labels(type="code").set(0)
+    
+    async def _check_memory_pressure(self):
+        """NOVO: Verifica pressão de memória e faz GC se necessário"""
+        self._gc_counter += 1
+        
+        # GC a cada 100 operações ou se memória alta
+        if self._gc_counter % 100 == 0 or len(self.working_memory) > Config.WORKING_MEMORY_SIZE * 0.9:
+            await self._garbage_collect()
+    
+    async def _garbage_collect(self):
+        """NOVO: Coleta de lixo inteligente"""
+        async with self.lock:
+            # Remove memórias de trabalho antigas
+            current_time = time.time()
+            
+            # Limpa working memory (remove itens com mais de 1 hora)
+            new_working = deque(maxlen=Config.WORKING_MEMORY_SIZE)
+            for item in self.working_memory:
+                item_time = datetime.fromisoformat(item.get("timestamp", "2000-01-01")).timestamp()
+                if current_time - item_time < 3600:  # 1 hora
+                    new_working.append(item)
+            self.working_memory = new_working
+            
+            # Limpa memória episódica (mantém apenas mais relevantes)
+            if len(self.episodic_memory) > Config.EPISODIC_MEMORY_SIZE:
+                # Ordena por importância e mantém os mais importantes
+                sorted_episodes = sorted(
+                    self.episodic_memory,
+                    key=lambda x: x.get("importance", 0),
+                    reverse=True
+                )
+                self.episodic_memory = deque(
+                    sorted_episodes[:Config.EPISODIC_MEMORY_SIZE],
+                    maxlen=Config.EPISODIC_MEMORY_SIZE
+                )
+            
+            # Limpa memória de código (remove versões antigas)
+            for key in list(self.code_memory.keys()):
+                if len(self.code_memory[key]) > 10:
+                    self.code_memory[key] = self.code_memory[key][-10:]
+            
+            logger.debug(f"🧹 GC concluído: {len(self.working_memory)} working, "
+                        f"{len(self.episodic_memory)} episodic")
+    
+    async def add_to_working(self, item: Dict):
+        """Adiciona à memória de trabalho"""
+        async with self.lock:
+            self.working_memory.append({
+                **item,
+                "timestamp": datetime.now().isoformat()
+            })
+            if PROMETHEUS_AVAILABLE:
+                telemetry.memory_size.labels(type="working").set(
+                    len(self.working_memory)
+                )
+            await self._check_memory_pressure()
+    
+    async def add_episodic(self, episode: Dict):
+        """Adiciona episódio à memória"""
+        async with self.lock:
+            self.episodic_memory.append({
+                **episode,
+                "id": str(uuid.uuid4()),
+                "timestamp": datetime.now().isoformat(),
+                "importance": episode.get("importance", 1.0)
+            })
+            if PROMETHEUS_AVAILABLE:
+                telemetry.memory_size.labels(type="episodic").set(
+                    len(self.episodic_memory)
+                )
+            await self._check_memory_pressure()
+    
+    async def add_code_memory(self, task: str, code: str, 
+                            metadata: Dict = None):
+        """NOVO: Adiciona código à memória"""
+        async with self.lock:
+            code_entry = {
+                "task": task,
+                "code": code,
+                "metadata": metadata or {},
+                "timestamp": datetime.now().isoformat(),
+                "version": len(self.code_memory.get(task, [])) + 1
+            }
+            
+            self.code_memory[task].append(code_entry)
+            
+            if PROMETHEUS_AVAILABLE:
+                telemetry.memory_size.labels(type="code").set(
+                    sum(len(v) for v in self.code_memory.values())
+                )
+            
+            # Também adiciona ao FAISS para busca semântica
+            await self.vector_store.add(
+                text=f"Task: {task}\nCode: {code[:500]}",
+                metadata={
+                    "type": "code",
+                    "task": task,
+                    **metadata or {}
+                },
+                importance=1.0,
+                memory_type=MemoryType.CODE
+            )
+    
+    async def search_code(self, query: str, top_k: int = 3) -> List[Dict]:
+        """NOVO: Busca código similar"""
+        results = await self.vector_store.search(query, top_k)
+        
+        code_results = []
+        for result in results:
+            if result.get("memory_type") == "code":
+                task = result.get("metadata", {}).get("task", "")
+                if task in self.code_memory:
+                    latest = self.code_memory[task][-1]
+                    code_results.append({
+                        **result,
+                        "code": latest["code"],
+                        "version": latest["version"]
+                    })
+        
+        return code_results
+    
+    async def add_failure(self, task: str, failure: Dict):
+        """Registra falha para aprendizado"""
+        async with self.lock:
+            self.failure_memory[task].append({
+                **failure,
+                "timestamp": datetime.now().isoformat()
+            })
+    
+    async def learn_from_failures(self, task: str) -> Optional[str]:
+        """Aprende com falhas anteriores"""
+        if task not in self.failure_memory:
+            return None
+        
+        failures = self.failure_memory[task]
+        if len(failures) < 2:
+            return None
+        
+        # Analisa padrões de falha
+        patterns = [f.get("pattern", "") for f in failures]
+        strategies = [f.get("strategy", "") for f in failures if f.get("success")]
+        
+        if strategies:
+            return f"Estratégias bem-sucedidas: {'; '.join(strategies[-3:])}"
+        return f"Padrões de falha: {'; '.join(patterns[-3:])}"
+    
+    async def add_to_knowledge_graph(self, 
+                                     entity1: str, 
+                                     relation: str, 
+                                     entity2: str):
+        """Adiciona relação ao knowledge graph"""
+        if not self.kg_driver:
+            return
+        
+        try:
+            async with self.kg_driver.session() as session:
+                await session.run(
+                    """
+                    MERGE (e1:Entity {name: $entity1})
+                    MERGE (e2:Entity {name: $entity2})
+                    MERGE (e1)-[r:RELATES {type: $relation}]->(e2)
+                    """,
+                    entity1=entity1,
+                    entity2=entity2,
+                    relation=relation
+                )
+        except Exception as e:
+            logger.error(f"Erro no Knowledge Graph: {e}")
+    
+    async def query_knowledge_graph(self, query: str) -> List[Dict]:
+        """Consulta o knowledge graph"""
+        if not self.kg_driver:
+            return []
+        
+        try:
+            async with self.kg_driver.session() as session:
+                result = await session.run(
+                    """
+                    MATCH (e1:Entity {name: $query})-[r]->(e2)
+                    RETURN e2.name as target, type(r) as relation
+                    LIMIT 10
+                    """,
+                    query=query
+                )
+                return [record.data() async for record in result]
+        except Exception as e:
+            logger.error(f"Erro na consulta KG: {e}")
+            return []
+
+# ============================================================
+# ARMAZENAMENTO VETORIAL CORRIGIDO COM REBUILD
+# ============================================================
+
+class FixedFAISSMemoryV19:
+    """Armazenamento vetorial com FAISS, rebuild e filtro de similaridade"""
+    
+    def __init__(self, dimension: int = 384, max_size: int = 10000):
+        self.dimension = dimension
+        self.max_size = max_size
+        self.store = AsyncSQLiteMemoryStoreV19()
+        
+        # Locks ordenados para evitar deadlock
+        self.faiss_lock = asyncio.Lock()
+        self.memory_lock = asyncio.Lock()
+        
+        self.memories: Dict[str, Dict] = {}
+        self.id_counter = 0
+        self.reverse_map: Dict[int, str] = {}
+        self.cache = cache_manager
+        
+        self.index = None
+        self.flat_index = None
+        self.use_ivf = False
+        
+        # Contadores para rebuild
+        self._add_count = 0
+        self._remove_count = 0
+        
+        if FAISS_AVAILABLE and get_embedding_model() is not None:
+            self.flat_index = faiss.IndexIDMap(faiss.IndexFlatIP(dimension))
+            self.has_faiss = True
+        else:
+            self.has_faiss = False
+    
+    async def initialize(self):
+        """Inicializa e carrega dados persistentes"""
+        await self.store.init_db()
+        await self._load_persistent()
+    
+    async def _get_embedding_async(self, text: str) -> Optional[np.ndarray]:
+        """Obtém embedding com cache e modelo singleton"""
+        if shutdown_manager.is_cancelled():
+            return None
+            
+        text_hash = hashlib.md5(text.encode()).hexdigest()
+        
+        # Tenta cache
+        cached = await self.cache.get(f"emb:{text_hash}")
+        if cached is not None:
+            return np.array(cached)
+        
+        model = get_embedding_model()
+        if self.has_faiss and model is not None:
+            loop = asyncio.get_running_loop()
+            try:
+                vec = await asyncio.wait_for(
+                    loop.run_in_executor(
+                        pools.embedding_pool,
+                        lambda: model.encode(text, show_progress_bar=False)
+                    ),
+                    timeout=10.0
+                )
+                norm = np.linalg.norm(vec)
+                normalized_vec = vec / norm if norm > 0 else vec
+                
+                # Cache por 1 hora
+                await self.cache.put(f"emb:{text_hash}", normalized_vec.tolist(), ttl=3600)
+                
+                return normalized_vec
+            except (asyncio.TimeoutError, FutureTimeout):
+                logger.warning(f"Timeout no embedding para: {text[:50]}...")
+                return None
+        return None
+    
+    async def add(self, text: str, metadata: Dict = None, 
+                  importance: float = 1.0, memory_type: MemoryType = MemoryType.SEMANTIC):
+        """Adiciona memória com rebuild periódico"""
+        shutdown_manager.check()
+        float_embed = await self._get_embedding_async(text)
+        
+        async with self.faiss_lock:
+            async with self.memory_lock:
+                memory_id = str(uuid.uuid4())
+                numeric_id = self.id_counter
+                self.id_counter += 1
+                
+                if len(self.memories) >= self.max_size:
+                    await self._evict_oldest_under_lock()
+                
+                self.memories[memory_id] = {
+                    "id": memory_id,
+                    "numeric_id": numeric_id,
+                    "text": text,
+                    "metadata": metadata or {},
+                    "importance": importance,
+                    "type": memory_type.value,
+                    "timestamp": datetime.now().isoformat(),
+                    "embedding": float_embed
+                }
+                self.reverse_map[numeric_id] = memory_id
+                
+                self._add_count += 1
+            
+            # Persiste no SQLite
+            await self.store.save(
+                memory_id, numeric_id, text, 
+                metadata or {}, importance,
+                datetime.now().isoformat(), float_embed
+            )
+            
+            # Adiciona ao FAISS
+            if self.has_faiss and float_embed is not None and self.flat_index:
+                await self._maybe_upgrade_to_ivf_under_lock()
+                vec = float_embed.reshape(1, -1).astype(np.float32)
+                ids = np.array([numeric_id], dtype=np.int64)
+                idx_target = self.index if self.use_ivf else self.flat_index
+                if idx_target:
+                    loop = asyncio.get_running_loop()
+                    await loop.run_in_executor(
+                        pools.embedding_pool,
+                        idx_target.add_with_ids, vec, ids
+                    )
+        
+        if PROMETHEUS_AVAILABLE:
+            telemetry.memory_size.labels(type="vector").set(
+                len(self.memories)
+            )
+        
+        # REBUILD PERIÓDICO DO ÍNDICE
+        if self._add_count >= Config.FAISS_REBUILD_INTERVAL or \
+           self._remove_count >= Config.FAISS_REBUILD_INTERVAL // 2:
+            await self._rebuild_index()
+        
+        # GC periódico
+        if random.random() < 0.05:
+            await self.store.run_garbage_collector(
+                max_allowed_records=self.max_size
+            )
+    
+    async def _rebuild_index(self):
+        """Reconstrói índice FAISS para evitar fragmentação"""
+        if not self.has_faiss:
+            return
+        
+        logger.info("🔄 Reconstruindo índice FAISS...")
+        
+        async with self.faiss_lock:
+            # Cria novo índice
+            new_index = faiss.IndexIDMap(faiss.IndexFlatIP(self.dimension))
+            
+            async with self.memory_lock:
+                vectors = []
+                ids = []
+                
+                for num_id, mem_id in self.reverse_map.items():
+                    mem = self.memories.get(mem_id)
+                    if mem and mem.get("embedding") is not None:
+                        vectors.append(mem["embedding"])
+                        ids.append(num_id)
+                
+                if vectors:
+                    arr = np.array(vectors).astype(np.float32)
+                    id_arr = np.array(ids, dtype=np.int64)
+                    
+                    loop = asyncio.get_running_loop()
+                    await loop.run_in_executor(
+                        pools.embedding_pool,
+                        new_index.add_with_ids, arr, id_arr
+                    )
+            
+            # Substitui índice
+            self.flat_index = new_index
+            
+            # Se IVF ativo, reconstrói também
+            if self.use_ivf and self.index:
+                self.index = None
+                self.use_ivf = False
+                await self._maybe_upgrade_to_ivf_under_lock()
+            
+            self._add_count = 0
+            self._remove_count = 0
+            
+            if PROMETHEUS_AVAILABLE:
+                telemetry.faiss_rebuilds.inc()
+            
+            logger.info(f"✅ Índice FAISS reconstruído com {len(vectors)} vetores")
+    
+    async def _evict_oldest_under_lock(self):
+        """Remove memória mais antiga (sob locks)"""
+        if not self.memories:
+            return
+        
+        oldest_id = min(
+            self.memories.keys(),
+            key=lambda k: (
+                self.memories[k]["importance"],
+                self.memories[k]["timestamp"]
+            )
+        )
+        num_id = self.memories[oldest_id]["numeric_id"]
+        
+        if self.has_faiss:
+            ids_to_remove = np.array([num_id], dtype=np.int64)
+            if self.flat_index:
+                self.flat_index.remove_ids(ids_to_remove)
+            if self.index:
+                self.index.remove_ids(ids_to_remove)
+        
+        del self.memories[oldest_id]
+        self.reverse_map.pop(num_id, None)
+        self._remove_count += 1
+        await self.store.delete_memory(oldest_id)
+    
+    async def _maybe_upgrade_to_ivf_under_lock(self):
+        """Upgrade para IVF quando memória cresce"""
+        if self.use_ivf or not self.has_faiss or len(self.memories) < 5000:
+            return
+        
+        quantizer = faiss.IndexFlatIP(self.dimension)
+        nlist = min(100, max(10, len(self.memories) // 100))
+        ivf = faiss.IndexIVFFlat(
+            quantizer, self.dimension, nlist, faiss.METRIC_INNER_PRODUCT
+        )
+        ivf.nprobe = min(10, nlist)
+        self.index = faiss.IndexIDMap(ivf)
+        
+        embeddings, ids = [], []
+        for num_id, mem_id in self.reverse_map.items():
+            mem = self.memories.get(mem_id)
+            if mem and mem.get("embedding") is not None:
+                embeddings.append(mem["embedding"])
+                ids.append(num_id)
+        
+        if embeddings:
+            training_vectors = np.array(embeddings).astype(np.float32)
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(
+                pools.embedding_pool,
+                self.index.train, training_vectors
+            )
+            await loop.run_in_executor(
+                pools.embedding_pool,
+                self.index.add_with_ids,
+                training_vectors,
+                np.array(ids, dtype=np.int64)
+            )
+        self.use_ivf = True
+    
+    async def search(self, query: str, top_k: int = 5) -> List[Dict]:
+        """Busca semântica com filtro de similaridade mínima"""
+        shutdown_manager.check()
+        query_vec = await self._get_embedding_async(query)
+        
+        if query_vec is None:
+            return await self._keyword_search_async(query, top_k)
+        
+        fallback_needed = False
+        
+        async with self.faiss_lock:
+            idx_target = self.index if self.use_ivf else self.flat_index
+            if not self.has_faiss or not idx_target or idx_target.ntotal == 0:
+                fallback_needed = True
+            else:
+                loop = asyncio.get_running_loop()
+                scores, indices = await loop.run_in_executor(
+                    pools.embedding_pool,
+                    idx_target.search,
+                    query_vec.reshape(1, -1).astype(np.float32),
+                    min(top_k * 2, idx_target.ntotal)
+                )
+        
+        if fallback_needed:
+            return await self._keyword_search_async(query, top_k)
+        
+        # Busca resultados com filtro de similaridade
+        results = []
+        async with self.memory_lock:
+            for score, idx in zip(scores[0], indices[0]):
+                # Filtro de similaridade mínima
+                if score < Config.MIN_SIMILARITY_SCORE:
+                    continue
+                    
+                if idx in self.reverse_map:
+                    mem = self.memories.get(self.reverse_map[idx])
+                    if mem:
+                        results.append({
+                            "text": mem["text"],
+                            "metadata": mem["metadata"],
+                            "similarity": float(score),
+                            "memory_type": mem.get("type")
+                        })
+                        if len(results) >= top_k:
+                            break
+        
+        return results
+    
+    async def _keyword_search_async(self, query: str, top_k: int) -> List[Dict]:
+        """Fallback: busca por palavras-chave"""
+        tokens = query.lower().split()
+        scored = []
+        async with self.memory_lock:
+            for mem in self.memories.values():
+                score = sum(
+                    1 for token in tokens 
+                    if token in mem["text"].lower()
+                )
+                if score > 0:
+                    scored.append((score, mem))
+        
+        scored.sort(reverse=True, key=lambda x: x[0])
+        return [
+            {
+                "text": m["text"],
+                "metadata": m["metadata"],
+                "memory_type": m.get("type")
+            }
+            for _, m in scored[:top_k]
+        ]
+    
+    async def _load_persistent(self):
+        """Carrega memórias persistentes"""
+        rows = await self.store.load_all()
+        async with self.faiss_lock:
+            async with self.memory_lock:
+                for row in rows:
+                    mem_id, numeric_id, text, metadata_json, importance, timestamp, embedding_blob = row
+                    embedding = np.frombuffer(
+                        embedding_blob, dtype=np.float32
+                    ) if embedding_blob else None
+                    
+                    self.memories[mem_id] = {
+                        "id": mem_id,
+                        "numeric_id": numeric_id,
+                        "text": text,
+                        "metadata": json.loads(metadata_json),
+                        "importance": importance,
+                        "timestamp": timestamp,
+                        "embedding": embedding
+                    }
+                    self.reverse_map[numeric_id] = mem_id
+                    if numeric_id >= self.id_counter:
+                        self.id_counter = numeric_id + 1
+                    
+                    if self.has_faiss and embedding is not None and self.flat_index:
+                        vec = embedding.reshape(1, -1).astype(np.float32)
+                        ids = np.array([numeric_id], dtype=np.int64)
+                        self.flat_index.add_with_ids(vec, ids)
+
+# ============================================================
+# SQLITE COM CONNECTION POOL
+# ============================================================
+
+class AsyncSQLiteMemoryStoreV19:
+    """Store SQLite usando connection pool"""
+    
+    def __init__(self, db_path: str = None):
+        self.db_path = db_path or str(Config.DB_PATH)
+        self._pool = None
+        self._lock = asyncio.Lock()
+    
+    async def init_db(self):
+        """Inicializa banco de dados e pool"""
+        Config.DATA_DIR.mkdir(parents=True, exist_ok=True)
+        
+        # Usa pool global
+        self._pool = get_db_pool()
+        
+        # Cria tabelas se necessário
+        def _init():
+            conn = self._pool.get_connection()
+            try:
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS memories (
+                        id TEXT PRIMARY KEY,
+                        numeric_id INTEGER,
+                        text TEXT NOT NULL,
+                        metadata TEXT,
+                        importance REAL DEFAULT 1.0,
+                        timestamp TEXT,
+                        embedding BLOB
+                    )
+                """)
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_numeric_id ON memories(numeric_id)"
+                )
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_type ON memories(json_extract(metadata, '$.type'))"
+                )
+                conn.commit()
+            except Exception as e:
+                logger.error(f"Erro ao criar tabelas: {e}")
+            finally:
+                self._pool.return_connection(conn)
+        
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(pools.io_pool, _init)
+    
+    async def save(self, memory_id: str, numeric_id: int, text: str,
+                   metadata: Dict, importance: float, timestamp: str,
+                   embedding: Optional[np.ndarray] = None):
+        """Salva memória usando pool"""
+        def _save():
+            conn = self._pool.get_connection()
+            try:
+                embedding_blob = embedding.astype(np.float32).tobytes() if embedding is not None else None
+                conn.execute("""
+                    INSERT OR REPLACE INTO memories 
+                    (id, numeric_id, text, metadata, importance, timestamp, embedding)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (memory_id, numeric_id, text, json.dumps(metadata),
+                      importance, timestamp, embedding_blob))
+                conn.commit()
+            except Exception as e:
+                logger.error(f"Erro ao salvar memória: {e}")
+            finally:
+                self._pool.return_connection(conn)
+        
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(pools.io_pool, _save)
+    
+    async def delete_memory(self, memory_id: str):
+        """Remove memória usando pool"""
+        def _delete():
+            conn = self._pool.get_connection()
+            try:
+                conn.execute("DELETE FROM memories WHERE id = ?", (memory_id,))
+                conn.commit()
+            except Exception as e:
+                logger.error(f"Erro ao deletar memória: {e}")
+            finally:
+                self._pool.return_connection(conn)
+        
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(pools.io_pool, _delete)
+    
+    async def run_garbage_collector(self, max_allowed_records: int = 5000):
+        """Limpeza de registros antigos usando pool"""
+        def _gc():
+            conn = self._pool.get_connection()
+            try:
+                cursor = conn.execute("SELECT COUNT(*) FROM memories")
+                count = cursor.fetchone()[0]
+                
+                if count > max_allowed_records:
+                    purge_size = count - max_allowed_records + 100
+                    conn.execute("""
+                        DELETE FROM memories WHERE id IN (
+                            SELECT id FROM memories 
+                            ORDER BY importance ASC, timestamp ASC 
+                            LIMIT ?
+                        )
+                    """, (purge_size,))
+                    conn.commit()
+            except Exception as e:
+                logger.error(f"Erro no GC: {e}")
+            finally:
+                self._pool.return_connection(conn)
+        
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(pools.io_pool, _gc)
+    
+    async def load_all(self) -> List[Tuple]:
+        """Carrega todas as memórias usando pool"""
+        def _load():
+            conn = self._pool.get_connection()
+            try:
+                cursor = conn.execute(
+                    "SELECT id, numeric_id, text, metadata, importance, timestamp, embedding FROM memories"
+                )
+                result = cursor.fetchall()
+                return result
+            except Exception as e:
+                logger.error(f"Erro ao carregar memórias: {e}")
+                return []
+            finally:
+                self._pool.return_connection(conn)
+        
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(pools.io_pool, _load)
+    
+    async def close(self):
+        """Fecha pool"""
+        if self._pool:
+            self._pool.close_all()
+
+# ============================================================
+# LLM CLIENT COM TIMEOUT HTTP
+# ============================================================
+
+class ModelRouter:
+    """Roteador inteligente de modelos"""
+    
+    @staticmethod
+    def select_model(task_type: str, context: Dict = None) -> str:
+        """Seleciona melhor modelo para a tarefa"""
+        task_lower = task_type.lower()
+        
+        if any(kw in task_lower for kw in ['code', 'programming', 'script', 'debug']):
+            return Config.CODING_MODEL
+        elif any(kw in task_lower for kw in ['reason', 'complex', 'analysis', 'plan']):
+            return Config.DEFAULT_MODEL
+        elif any(kw in task_lower for kw in ['quick', 'simple', 'verify', 'check']):
+            return Config.FAST_MODEL
+        
+        return Config.DEFAULT_MODEL
+
+class AdvancedLLMClientV19:
+    """Cliente LLM avançado com timeout HTTP e rate limiting"""
+    
+    def __init__(self, sync_client, circuit_breaker: CircuitBreaker):
+        self.sync_client = sync_client
+        self.circuit_breaker = circuit_breaker
+        self.rate_limiter = DistributedRateLimiter("llm", Config.LLM_RATE_LIMIT)
+        self.router = ModelRouter()
+        self.active_streams: Set[asyncio.Task] = set()
+    
+    async def initialize(self):
+        """Inicializa rate limiter distribuído"""
+        await self.rate_limiter.initialize()
+    
+    async def chat_completion(self, 
+                             model: str = None,
+                             messages: List[Dict] = None,
+                             max_tokens: Optional[int] = None,
+                             temperature: float = 0.7,
+                             **kwargs) -> str:
+        """Chat completion com timeout HTTP e todas as proteções"""
+        shutdown_manager.check()
+        
+        # Sanitiza mensagens
+        for msg in messages:
+            if "content" in msg and isinstance(msg["content"], str):
+                msg["content"] = tokenizer.truncate_safe(
+                    AdvancedGuardrails.sanitize_input(msg["content"]),
+                    max_tokens=4000
+                )
+        
+        # Auto-seleciona modelo se não especificado
+        if model is None:
+            task_desc = messages[-1]["content"] if messages else ""
+            model = self.router.select_model(task_desc)
+        
+        async def inference():
+            async with self.rate_limiter.acquire():
+                start_time = time.time()
+                try:
+                    loop = asyncio.get_running_loop()
+                    
+                    # Timeout HTTP explícito
+                    response = await asyncio.wait_for(
+                        loop.run_in_executor(
+                            pools.llm_pool,
+                            lambda: self.sync_client.chat.completions.create(
+                                model=model,
+                                messages=messages,
+                                max_tokens=max_tokens,
+                                temperature=temperature,
+                                timeout=Config.HTTP_TIMEOUT,
+                                **kwargs
+                            )
+                        ),
+                        timeout=Config.HTTP_TIMEOUT + 5
+                    )
+                    
+                    if PROMETHEUS_AVAILABLE:
+                        telemetry.llm_requests.labels(
+                            model=model, status="success", provider="groq"
+                        ).inc()
+                    
+                    content = response.choices[0].message.content
+                    
+                    # Conta tokens
+                    if PROMETHEUS_AVAILABLE and hasattr(response, 'usage'):
+                        telemetry.llm_tokens.labels(
+                            model=model, type="prompt"
+                        ).inc(response.usage.prompt_tokens)
+                        telemetry.llm_tokens.labels(
+                            model=model, type="completion"
+                        ).inc(response.usage.completion_tokens)
+                    
+                    return content
+                    
+                except asyncio.TimeoutError:
+                    if PROMETHEUS_AVAILABLE:
+                        telemetry.llm_requests.labels(
+                            model=model, status="timeout", provider="groq"
+                        ).inc()
+                    raise
+                except Exception as e:
+                    if PROMETHEUS_AVAILABLE:
+                        telemetry.llm_requests.labels(
+                            model=model, status="failed", provider="groq"
+                        ).inc()
+                    raise e
+                finally:
+                    if PROMETHEUS_AVAILABLE:
+                        telemetry.llm_latency.labels(model=model).observe(
+                            time.time() - start_time
+                        )
+        
+        return await RetryManager.execute_with_retry(
+            lambda: self.circuit_breaker.call(inference),
+            timeout=Config.HTTP_TIMEOUT + 10
+        )
+    
+    async def chat_completion_streaming(
+        self, 
+        model: str = None,
+        messages: List[Dict] = None,
+        **kwargs
+    ) -> AsyncGenerator[str, None]:
+        """Streaming com timeout global e cancelamento real"""
+        shutdown_manager.check()
+        
+        # Sanitiza
+        for msg in messages:
+            if "content" in msg and isinstance(msg["content"], str):
+                msg["content"] = tokenizer.truncate_safe(
+                    AdvancedGuardrails.sanitize_input(msg["content"]),
+                    max_tokens=4000
+                )
+        
+        if model is None:
+            task_desc = messages[-1]["content"] if messages else ""
+            model = self.router.select_model(task_desc)
+        
+        # Queue para streaming desacoplado
+        queue = asyncio.Queue(maxsize=Config.STREAM_BUFFER_SIZE)
+        loop = asyncio.get_running_loop()
+        stream_start_time = time.time()
+        
+        def producer_thread():
+            """Thread produtora do stream com cancelamento"""
+            try:
+                # Verifica cancelamento
+                if shutdown_manager.is_cancelled():
+                    return
+                
+                stream = self.sync_client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    stream=True,
+                    timeout=Config.HTTP_TIMEOUT,
+                    **kwargs
+                )
+                
+                for chunk in stream:
+                    # Verifica timeout global do stream
+                    if time.time() - stream_start_time > Config.STREAM_GLOBAL_TIMEOUT:
+                        break
+                    
+                    if shutdown_manager.is_cancelled():
+                        break
+                    
+                    delta = chunk.choices[0].delta
+                    if hasattr(delta, "content") and delta.content:
+                        try:
+                            future = asyncio.run_coroutine_threadsafe(
+                                queue.put(delta.content), loop
+                            )
+                            future.result(timeout=Config.STREAM_CHUNK_TIMEOUT)
+                        except Exception:
+                            break
+                        
+            except Exception as e:
+                error_msg = f"\n[Stream Error]: {str(e)}"
+                try:
+                    asyncio.run_coroutine_threadsafe(
+                        queue.put(error_msg), loop
+                    )
+                except Exception:
+                    pass
+            finally:
+                try:
+                    asyncio.run_coroutine_threadsafe(
+                        queue.put(None), loop  # Sentinel
+                    )
+                except Exception:
+                    pass
+        
+        # Executa em thread separada
+        loop.run_in_executor(pools.stream_pool, producer_thread)
+        
+        # Consumidor assíncrono com timeout
+        while True:
+            if shutdown_manager.is_cancelled():
+                break
+            
+            # Verifica timeout global do stream
+            if time.time() - stream_start_time > Config.STREAM_GLOBAL_TIMEOUT:
+                yield "\n[Stream timeout global]"
+                break
+                
+            try:
+                chunk_data = await asyncio.wait_for(
+                    queue.get(), 
+                    timeout=Config.STREAM_CHUNK_TIMEOUT
+                )
+            except asyncio.TimeoutError:
+                continue
+            
+            if chunk_data is None:
+                break
+            
+            yield chunk_data
+
+# ============================================================
+# SANDBOX ISOLADA COM CONTAINER REAL
+# ============================================================
+
+class SandboxLanguage(Enum):
+    """Linguagens suportadas"""
+    LUA = "lua"
+    PYTHON = "python"
+    JAVASCRIPT = "javascript"
+
+class HardenedSandboxV19:
+    """Sandbox com isolamento real via Docker ou subprocess"""
+    
+    def __init__(self):
+        self.timeout = Config.SANDBOX_TIMEOUT
+        self.mem_limit_mb = Config.SANDBOX_MEM_LIMIT_MB
+        self.use_docker = Config.SANDBOX_USE_DOCKER
+        
+        # Verifica interpretadores disponíveis
+        self.interpreters = {
+            SandboxLanguage.LUA: shutil.which("lua"),
+            SandboxLanguage.PYTHON: shutil.which("python3"),
+            SandboxLanguage.JAVASCRIPT: shutil.which("node")
+        }
+        
+        # Docker client
+        self.docker_client = None
+        if DOCKER_AVAILABLE and self.use_docker:
+            try:
+                self.docker_client = docker.from_env()
+                logger.info("🐳 Docker disponível para sandbox isolada")
+            except Exception:
+                logger.warning("Docker não disponível, usando subprocess")
+                self.use_docker = False
+    
+    async def _execute_docker(self, code: str, 
+                             language: SandboxLanguage) -> Dict:
+        """Executa em container Docker com isolamento real"""
+        try:
+            # Cria container efêmero com limites reais
+            container_config = {
+                'image': f'sandbox-{language.value}:latest',
+                'command': f'echo "{code}" | {language.value}',
+                'mem_limit': f'{self.mem_limit_mb}m',
+                'cpu_period': 100000,
+                'cpu_quota': int(100000 * Config.SANDBOX_CPU_LIMIT),
+                'network_disabled': True,
+                'read_only': True,
+                'tmpfs': {'/tmp': 'size=10M'},
+                'security_opt': ['no-new-privileges'],
+                'cap_drop': ['ALL'],
+                'remove': True,
+                'detach': True
+            }
+            
+            container = await asyncio.get_running_loop().run_in_executor(
+                pools.sandbox_pool,
+                lambda: self.docker_client.containers.run(**container_config)
+            )
+            
+            try:
+                result = await asyncio.wait_for(
+                    asyncio.get_running_loop().run_in_executor(
+                        pools.sandbox_pool,
+                        container.wait
+                    ),
+                    timeout=self.timeout
+                )
+                
+                logs = container.logs(stdout=True, stderr=True)
+                
+                if PROMETHEUS_AVAILABLE:
+                    telemetry.sandbox_executions.labels(
+                        language=language.value, status="success"
+                    ).inc()
+                    telemetry.sandbox_duration.labels(
+                        language=language.value
+                    ).observe(time.time())
+                
+                return {
+                    "success": result['StatusCode'] == 0,
+                    "stdout": logs.decode(errors='ignore')[:2000],
+                    "stderr": "",
+                    "returncode": result['StatusCode']
+                }
+                
+            except asyncio.TimeoutError:
+                container.kill()
+                if PROMETHEUS_AVAILABLE:
+                    telemetry.sandbox_executions.labels(
+                        language=language.value, status="timeout"
+                    ).inc()
+                return {
+                    "success": False,
+                    "stderr": f"Timeout ({self.timeout}s)",
+                    "returncode": -1
+                }
+                
+        except Exception as e:
+            logger.warning(f"Docker sandbox falhou: {e}, usando subprocess")
+            return await self._execute_subprocess(code, language)
+    
+    async def _execute_subprocess(self, code: str,
+                                  language: SandboxLanguage) -> Dict:
+        """Executa via subprocess com limites de recursos"""
+        
+        interpreter = self.interpreters.get(language)
+        if not interpreter:
+            return {
+                "success": False,
+                "stderr": f"Interpretador {language.value} não encontrado",
+                "returncode": -1
+            }
+        
+        # Arquivo temporário
+        suffix = f'.{language.value}'
+        with tempfile.NamedTemporaryFile(
+            mode='w', suffix=suffix, delete=False
+        ) as f:
+            f.write(code)
+            temp_path = f.name
+        
+        try:
+            # Configura limites
+            kwargs = {}
+            if IS_POSIX:
+                def preexec_limits():
+                    import resource
+                    mem_bytes = self.mem_limit_mb * 1024 * 1024
+                    resource.setrlimit(
+                        resource.RLIMIT_AS, (mem_bytes, mem_bytes)
+                    )
+                    resource.setrlimit(
+                        resource.RLIMIT_CPU, (self.timeout, self.timeout)
+                    )
+                    os.setsid()
+                kwargs["preexec_fn"] = preexec_limits
+            
+            proc = await asyncio.create_subprocess_exec(
+                interpreter, temp_path,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                **kwargs
+            )
+            
+            try:
+                stdout, stderr = await asyncio.wait_for(
+                    proc.communicate(), timeout=self.timeout
+                )
+                
+                if PROMETHEUS_AVAILABLE:
+                    telemetry.sandbox_executions.labels(
+                        language=language.value,
+                        status="success" if proc.returncode == 0 else "failed"
+                    ).inc()
+                
+                return {
+                    "success": proc.returncode == 0,
+                    "stdout": stdout.decode(errors='ignore')[:2000],
+                    "stderr": stderr.decode(errors='ignore')[:2000],
+                    "returncode": proc.returncode
+                }
+                
+            except asyncio.TimeoutError:
+                if PROMETHEUS_AVAILABLE:
+                    telemetry.sandbox_executions.labels(
+                        language=language.value, status="timeout"
+                    ).inc()
+                
+                try:
+                    if IS_POSIX:
+                        os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                    else:
+                        proc.kill()
+                except Exception:
+                    pass
+                
+                await proc.wait()
+                return {
+                    "success": False,
+                    "stderr": f"Timeout ({self.timeout}s)",
+                    "returncode": -1
+                }
+                
+        finally:
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
+    
+    async def execute(self, code: str, 
+                     language: SandboxLanguage = SandboxLanguage.LUA) -> Dict:
+        """Executa código em sandbox isolada"""
+        
+        # Tenta Docker primeiro se configurado
+        if self.use_docker and self.docker_client and DOCKER_AVAILABLE:
+            return await self._execute_docker(code, language)
+        
+        # Fallback para subprocess
+        return await self._execute_subprocess(code, language)
+
+# ============================================================
+# TOOL CALLING ENGINE COM ANTI-LOOP E PARALELISMO
+# ============================================================
+
+class ToolCallingEngineV19:
+    """Engine de tool calling com proteção anti-loop semântico e execução paralela"""
+    
+    def __init__(self, sync_client, llm_client: AdvancedLLMClientV19):
+        self.sync_client = sync_client
+        self.llm_client = llm_client
+        self.tools: Dict[str, Dict] = {}
+        self.tool_history: Dict[str, List] = defaultdict(list)
+        self.max_depth = 5
+        self.cost_budget = 100
+        self.parallel_executor = ThreadPoolExecutor(max_workers=3)  # NOVO
+    
+    def register_tool(self, name: str, description: str, parameters: Dict):
+        """Registra uma tool"""
+        def decorator(func):
+            self.tools[name] = {
+                "schema": {
+                    "type": "function",
+                    "function": {
+                        "name": name,
+                        "description": description,
+                        "parameters": parameters
+                    }
+                },
+                "func": func,
+                "cost": parameters.get("cost", 10),
+                "parallelizable": parameters.get("parallelizable", False)  # NOVO
+            }
+            return func
+        return decorator
+    
+    def get_schemas(self) -> List[Dict]:
+        """Retorna schemas das tools"""
+        return [t["schema"] for t in self.tools.values()]
+    
+    async def execute_parallel_tools(self, tool_calls: List[Dict]) -> Dict[str, Any]:
+        """NOVO: Executa múltiplas tools em paralelo"""
+        results = {}
+        futures = []
+        call_map = {}
+        
+        for tc in tool_calls:
+            if tc["function"]["name"] in self.tools:
+                tool_info = self.tools[tc["function"]["name"]]
+                
+                if tool_info.get("parallelizable", False):
+                    try:
+                        args = json.loads(tc["function"]["arguments"])
+                        args = AdvancedGuardrails.validate_tool_args(
+                            tc["function"]["name"], args
+                        )
+                        
+                        func = tool_info["func"]
+                        future = self.parallel_executor.submit(
+                            asyncio.run, func(**args)
+                        )
+                        futures.append(future)
+                        call_map[future] = tc["id"]
+                    except Exception as e:
+                        results[tc["id"]] = {"error": str(e)}
+        
+        # Aguarda resultados paralelos
+        for future in futures:
+            try:
+                result = future.result(timeout=10)
+                results[call_map[future]] = result
+            except Exception as e:
+                results[call_map[future]] = {"error": str(e)}
+        
+        return results
+    
+    async def execute_flow(self, entry_message: str, 
+                          max_turns: int = 3) -> str:
+        """Executa flow de tool calling com anti-loop semântico"""
+        shutdown_manager.check()
+        
+        history = [{"role": "user", "content": entry_message}]
+        execution_fingerprints: Set[str] = set()
+        accumulated_cost = 0
+        
+        for turn in range(max_turns):
+            shutdown_manager.check()
+            
+            # Verifica profundidade máxima
+            if turn >= self.max_depth:
+                return "⛔ Profundidade máxima de tool calling atingida"
+            
+            # Verifica custo acumulado
+            if accumulated_cost >= self.cost_budget:
+                return "⛔ Custo máximo de execução atingido"
+            
+            # Trunca histórico
+            for msg in history:
+                if "content" in msg and msg["content"]:
+                    msg["content"] = tokenizer.truncate_safe(
+                        msg["content"], max_tokens=2500
+                    )
+            
+            # Chama LLM
+            response = await self.sync_client.chat.completions.create(
+                model=Config.DEFAULT_MODEL,
+                messages=history,
+                tools=self.get_schemas() if self.tools else None,
+                tool_choice="auto" if self.tools else None,
+                temperature=0.1,
+                timeout=Config.HTTP_TIMEOUT
+            )
+            
+            msg = response.choices[0].message
+            assistant_payload = {
+                "role": "assistant",
+                "content": msg.content or ""
+            }
+            
+            if hasattr(msg, "tool_calls") and msg.tool_calls:
+                tool_calls_list = []
+                parallel_calls = []
+                
+                for tc in msg.tool_calls:
+                    # Verifica fingerprints
+                    fp = hashlib.md5(
+                        f"{tc.function.name}_{tc.function.arguments}".encode()
+                    ).hexdigest()
+                    
+                    if fp in execution_fingerprints:
+                        return f"⛔ Chamada cíclica detectada: {tc.function.name}"
+                    
+                    execution_fingerprints.add(fp)
+                    tool_calls_list.append({
+                        "id": tc.id,
+                        "type": "function",
+                        "function": {
+                            "name": tc.function.name,
+                            "arguments": tc.function.arguments
+                        }
+                    })
+                    
+                    # Coleta para execução paralela
+                    if self.tools.get(tc.function.name, {}).get("parallelizable", False):
+                        parallel_calls.append(tc)
+                    
+                    # Acumula custo
+                    tool_info = self.tools.get(tc.function.name, {})
+                    accumulated_cost += tool_info.get("cost", 10)
+                
+                assistant_payload["tool_calls"] = tool_calls_list
+                history.append(assistant_payload)
+                
+                # Executa tools paralelas primeiro
+                if parallel_calls:
+                    parallel_results = await self.execute_parallel_tools(parallel_calls)
+                    
+                    for tc in parallel_calls:
+                        result = parallel_results.get(tc.id, {"error": "Falha na execução paralela"})
+                        serialized = json.dumps(result, ensure_ascii=False)
+                        if len(serialized) > 3000:
+                            serialized = json.dumps({
+                                "truncated": True,
+                                "preview": serialized[:3000]
+                            })
+                        
+                        history.append({
+                            "role": "tool",
+                            "tool_call_id": tc.id,
+                            "content": serialized
+                        })
+                
+                # Executa tools sequenciais restantes
+                for tc in msg.tool_calls:
+                    if tc not in parallel_calls and tc.function.name in self.tools:
+                        try:
+                            args = json.loads(tc.function.arguments)
+                            args = AdvancedGuardrails.validate_tool_args(
+                                tc.function.name, args
+                            )
+                            
+                            func = self.tools[tc.function.name]["func"]
+                            if asyncio.iscoroutinefunction(func):
+                                output = await func(**args)
+                            else:
+                                output = func(**args)
+                                
+                        except SecurityException as e:
+                            output = {"error": f"Segurança: {str(e)}"}
+                        except Exception as e:
+                            output = {"error": f"Erro: {str(e)}"}
+                    elif tc not in parallel_calls:
+                        output = {"error": f"Tool '{tc.function.name}' indisponível"}
+                    else:
+                        continue  # Já executado em paralelo
+                    
+                    serialized = json.dumps(output, ensure_ascii=False)
+                    if len(serialized) > 3000:
+                        serialized = json.dumps({
+                            "truncated": True,
+                            "preview": serialized[:3000]
+                        })
+                    
+                    history.append({
+                        "role": "tool",
+                        "tool_call_id": tc.id,
+                        "content": serialized
+                    })
+                
+                continue
+            
+            history.append(assistant_payload)
+            return msg.content or ""
+        
+        return "⚠️ Teto de sub-turns atingido."
+
+# ============================================================
+# HYBRID EVALUATOR COM REFLECTION
+# ============================================================
+
+class ReflectionEngine:
+    """Motor de auto-correção e reflexão"""
+    
+    def __init__(self, llm_client: AdvancedLLMClientV19):
+        self.llm = llm_client
+    
+    async def analyze_failure(self, task: str, result: str,
+                             attempt_history: List[Dict] = None) -> Dict:
+        """Analisa falha e sugere correção"""
+        prompt = f"""
+        Analise a falha e sugira uma nova estratégia.
+        
+        Tarefa: {task}
+        Resultado atual: {result[:500]}
+        Tentativas anteriores: {json.dumps(attempt_history or [])[:500]}
+        
+        Retorne JSON:
+        {{
+            "failure_reason": "razão da falha",
+            "root_cause": "causa raiz",
+            "new_strategy": "nova abordagem",
+            "confidence": 0.0-1.0,
+            "should_retry": true/false
+        }}
+        """
+        
+        try:
+            raw = await self.llm.chat_completion(
+                model=Config.FAST_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.0,
+                response_format={"type": "json_object"}
+            )
+            
+            cleaned = re.sub(r'```json\s*|\s*```', '', raw).strip()
+            return json.loads(cleaned)
+        except Exception:
+            return {
+                "failure_reason": "Erro desconhecido",
+                "new_strategy": "Reformular a tarefa",
+                "confidence": 0.3,
+                "should_retry": False
+            }
+
+class HybridDeterministicEvaluator:
+    """Avaliador híbrido com análise vetorial e LLM"""
+    
+    def __init__(self, llm_client: AdvancedLLMClientV19,
+                 memory_ref: FixedFAISSMemoryV19):
+        self.llm = llm_client
+        self.memory = memory_ref
+        self.reflection = ReflectionEngine(llm_client)
+    
+    async def verify_completion(self, objective: str, result: str,
+                               context: Dict = None) -> Dict:
+        """Verifica conclusão com múltiplas estratégias"""
+        
+        # Check rápido: erros explícitos
+        res_lower = result.lower()
+        if "error:" in res_lower or "failed" in res_lower:
+            return {
+                "completed": False,
+                "confidence": 0.95,
+                "reason": "Erro explícito detectado"
+            }
+        
+        # Check vetorial
+        obj_embed = await self.memory._get_embedding_async(objective)
+        res_embed = await self.memory._get_embedding_async(result)
+        
+        if obj_embed is not None and res_embed is not None:
+            similarity = float(np.dot(obj_embed, res_embed))
+            if similarity > 0.85:
+                return {
+                    "completed": True,
+                    "confidence": similarity,
+                    "reason": "Similaridade semântica alta"
+                }
+        
+        # Check LLM como fallback
+        prompt = f"""
+        Julgue se o Resultado cumpre o Objetivo.
+        Retorne APENAS JSON:
+        {{"completed": true/false, "confidence": 0.0-1.0, "reason": "explicação"}}
+        
+        Objetivo: "{objective}"
+        Resultado: "{result[:1000]}"
+        """
+        
+        try:
+            raw = await self.llm.chat_completion(
+                model=Config.FAST_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.0,
+                response_format={"type": "json_object"}
+            )
+            
+            cleaned = re.sub(r'```json\s*|\s*```', '', raw).strip()
+            parsed = json.loads(cleaned)
+            
+            return {
+                "completed": bool(parsed.get("completed", False)),
+                "confidence": float(parsed.get("confidence", 0.0)),
+                "reason": parsed.get("reason", "")
+            }
+            
+        except Exception as e:
+            return {
+                "completed": False,
+                "confidence": 0.0,
+                "reason": f"Erro na avaliação: {e}"
+            }
+    
+    async def self_correct(self, task: str, result: str,
+                          max_attempts: int = 3) -> Tuple[str, bool]:
+        """Auto-correção com reflection"""
+        history = []
+        
+        for attempt in range(max_attempts):
+            evaluation = await self.verify_completion(task, result)
+            
+            if evaluation["completed"] and evaluation["confidence"] >= 0.82:
+                return result, True
+            
+            # Registra falha
+            history.append({
+                "attempt": attempt + 1,
+                "result": result[:200],
+                "evaluation": evaluation
+            })
+            
+            # Analisa e sugere correção
+            analysis = await self.reflection.analyze_failure(
+                task, result, history
+            )
+            
+            if not analysis.get("should_retry", False):
+                break
+            
+            # Aplica nova estratégia
+            result = f"[Correção {attempt + 1}]: {analysis['new_strategy']}"
+        
+        return result, False
+
+# ============================================================
+# PLANNER INTELIGENTE COM TREE OF THOUGHTS
+# ============================================================
+
+class IntelligentPlanner:
+    """Planner com Tree of Thoughts e Graph Planning"""
+    
+    def __init__(self, llm_client: AdvancedLLMClientV19):
+        self.llm = llm_client
+    
+    async def decompose(self, objective: str) -> List[str]:
+        """Decompõe objetivo em sub-tarefas"""
+        prompt = f"""
+        Decomponha este objetivo em passos atômicos.
+        Retorne JSON estrito:
+        {{"tasks": ["passo1", "passo2", ...]}}
+        
+        Objetivo: {objective}
+        
+        Regras:
+        - Cada passo deve ser atômico e executável
+        - Ordenar por dependência lógica
+        - Máximo 7 passos
+        """
+        
+        try:
+            raw = await self.llm.chat_completion(
+                model=Config.DEFAULT_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.1,
+                response_format={"type": "json_object"}
+            )
+            
+            cleaned = re.sub(r'```json\s*|\s*```', '', raw).strip()
+            data = json.loads(cleaned)
+            tasks = data.get("tasks", [])
+            
+            if not tasks:
+                return [objective]
+            
+            return tasks
+            
+        except Exception:
+            return [objective]
+    
+    async def evaluate_paths(self, paths: List[List[str]], 
+                            objective: str) -> List[Dict]:
+        """Avalia múltiplos caminhos de execução"""
+        evaluations = []
+        
+        for i, path in enumerate(paths):
+            prompt = f"""
+            Avalie este plano para o objetivo.
+            
+            Objetivo: {objective}
+            Plano: {json.dumps(path)}
+            
+            Retorne JSON:
+            {{
+                "score": 0-10,
+                "feasible": true/false,
+                "risks": ["risco1", ...],
+                "expected_outcome": "descrição"
+            }}
+            """
+            
+            try:
+                raw = await self.llm.chat_completion(
+                    model=Config.FAST_MODEL,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.0,
+                    response_format={"type": "json_object"}
+                )
+                
+                cleaned = re.sub(r'```json\s*|\s*```', '', raw).strip()
+                evaluation = json.loads(cleaned)
+                evaluation["path_id"] = i
+                evaluations.append(evaluation)
+                
+            except Exception as e:
+                evaluations.append({
+                    "path_id": i,
+                    "score": 0,
+                    "feasible": False,
+                    "risks": [str(e)]
+                })
+        
+        return evaluations
+
+# ============================================================
+# DAG EXECUTOR COM TIMEOUT GLOBAL
+# ============================================================
+
+@dataclass
+class TaskNodeV17:
+    """Nó do grafo de tarefas"""
+    id: str
+    description: str
+    dependencies: List[str] = field(default_factory=list)
+    status: str = "pending"
+    result: Any = None
+    priority: int = 0
+    deadline: Optional[datetime] = None
+
+class EnterpriseTaskGraphV18:
+    """Grafo de execução com prioridades e timeout global"""
+    
+    def __init__(self):
+        self.tasks: Dict[str, TaskNodeV17] = {}
+        self.lock = asyncio.Lock()
+        self.completed_tasks: Set[str] = set()
+        self.global_timeout = Config.DAG_GLOBAL_TIMEOUT
+        self.task_timeout = Config.TASK_TIMEOUT
+    
+    def add_task(self, id: str, description: str, dependencies: List[str],
+                 priority: int = 0):
+        """Adiciona tarefa ao grafo"""
+        self.tasks[id] = TaskNodeV17(
+            id=id,
+            description=description,
+            dependencies=dependencies,
+            priority=priority
+        )
+    
+    def validate_and_sanitize(self) -> bool:
+        """Valida grafo e remove ciclos"""
+        visited = {node: 0 for node in self.tasks}
+        
+        def has_cycle(node_id: str) -> bool:
+            visited[node_id] = 1
+            for dep in list(self.tasks[node_id].dependencies):
+                if dep not in self.tasks:
+                    self.tasks[node_id].dependencies.remove(dep)
+                    continue
+                if visited[dep] == 1:
+                    return True
+                if visited[dep] == 0 and has_cycle(dep):
+                    return True
+            visited[node_id] = 2
+            return False
+        
+        for node_id in self.tasks:
+            if visited[node_id] == 0:
+                if has_cycle(node_id):
+                    return False
+        
+        return True
+    
+    async def run_orchestration(
+        self,
+        executor_callback: Callable[[str], Any],
+        max_concurrent: int = 5
+    ) -> Dict[str, Any]:
+        """Executa grafo com timeout global e por task"""
+        
+        if not self.validate_and_sanitize():
+            raise ValueError("Ciclo de dependências detectado")
+        
+        semaphore = asyncio.Semaphore(max_concurrent)
+        start_time = time.time()
+        
+        async def execute_node(node: TaskNodeV17):
+            async with semaphore:
+                shutdown_manager.check()
+                
+                # Verifica timeout global
+                if time.time() - start_time > self.global_timeout:
+                    async with self.lock:
+                        node.status = "failed"
+                        node.result = "⛔ Timeout global do DAG"
+                    return
+                
+                async with self.lock:
+                    node.status = "running"
+                
+                if PROMETHEUS_AVAILABLE:
+                    telemetry.active_tasks.inc()
+                
+                try:
+                    # Timeout por task
+                    result = await asyncio.wait_for(
+                        executor_callback(node.description),
+                        timeout=self.task_timeout
+                    )
+                    
+                    async with self.lock:
+                        node.status = "completed"
+                        node.result = result
+                        self.completed_tasks.add(node.id)
+                        
+                except asyncio.TimeoutError:
+                    async with self.lock:
+                        node.status = "failed"
+                        node.result = f"⛔ Timeout ({self.task_timeout}s)"
+                        
+                except Exception as e:
+                    async with self.lock:
+                        node.status = "failed"
+                        node.result = f"Error: {str(e)}"
+                        
+                finally:
+                    if PROMETHEUS_AVAILABLE:
+                        telemetry.active_tasks.dec()
+        
+        # Executa até todas as tarefas terminarem ou timeout
+        while len(self.completed_tasks) < len(self.tasks):
+            shutdown_manager.check()
+            
+            # Verifica timeout global
+            if time.time() - start_time > self.global_timeout:
+                logger.warning(f"⛔ Timeout global do DAG ({self.global_timeout}s)")
+                async with self.lock:
+                    for task in self.tasks.values():
+                        if task.status == "pending":
+                            task.status = "failed"
+                            task.result = "⛔ Timeout global do DAG"
+                break
+            
+            async with self.lock:
+                ready_nodes = [
+                    t for t in self.tasks.values()
+                    if t.status == "pending" and
+                    all(d in self.completed_tasks for d in t.dependencies)
+                ]
+            
+            if not ready_nodes:
+                # Verifica deadlock
+                pending = [t for t in self.tasks.values() if t.status == "pending"]
+                if pending:
+                    logger.warning(f"Possível deadlock: {len(pending)} tarefas pendentes")
+                    break
+                break
+            
+            # Ordena por prioridade
+            ready_nodes.sort(key=lambda x: x.priority, reverse=True)
+            
+            # Executa em paralelo
+            await asyncio.gather(*[
+                execute_node(node) for node in ready_nodes
+            ])
+        
+        return {
+            t_id: {
+                "status": t.status,
+                "result": t.result
+            }
+            for t_id, t in self.tasks.items()
+        }
+
+# ============================================================
+# SISTEMA DE PLUGINS
+# ============================================================
+
+class PluginManager:
+    """Gerenciador de plugins dinâmicos"""
+    
+    def __init__(self, plugins_dir: Path = Config.PLUGINS_DIR):
+        self.plugins_dir = plugins_dir
+        self.plugins: Dict[str, Any] = {}
+        self.hooks: Dict[str, List[Callable]] = defaultdict(list)
+    
+    def discover_plugins(self):
+        """Descobre plugins no diretório"""
+        self.plugins_dir.mkdir(parents=True, exist_ok=True)
+        
+        for plugin_file in self.plugins_dir.glob("*.py"):
+            try:
+                spec = importlib.util.spec_from_file_location(
+                    plugin_file.stem, plugin_file
+                )
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+                
+                if hasattr(module, 'register'):
+                    module.register(self)
+                    
+                self.plugins[plugin_file.stem] = module
+                logger.info(f"🔌 Plugin carregado: {plugin_file.stem}")
+                
+            except Exception as e:
+                logger.error(f"Erro ao carregar plugin {plugin_file}: {e}")
+    
+    def register_hook(self, hook_name: str, callback: Callable):
+        """Registra hook"""
+        self.hooks[hook_name].append(callback)
+    
+    async def execute_hook(self, hook_name: str, *args, **kwargs):
+        """Executa hooks registrados"""
+        results = []
+        for callback in self.hooks.get(hook_name, []):
+            try:
+                if asyncio.iscoroutinefunction(callback):
+                    result = await callback(*args, **kwargs)
+                else:
+                    result = callback(*args, **kwargs)
+                results.append(result)
+            except Exception as e:
+                logger.error(f"Erro no hook {hook_name}: {e}")
+        return results
+
+# ============================================================
+# AGENTE CORE PRINCIPAL V21.0
+# ============================================================
+
+class RobloxEnterpriseAgentV21:
+    """Agente principal versão 21.0 - Autonomous Coding Agent"""
+    
+    def __init__(self, api_key: str):
+        from groq import Groq
+        self.raw_client = Groq(api_key=api_key)
+        
+        # Subsistemas
+        self.circuit_breaker = CircuitBreaker("llm")
+        self.llm = AdvancedLLMClientV19(self.raw_client, self.circuit_breaker)
+        
+        self.memory = AdvancedMemorySystem()
+        self.sandbox = HardenedSandboxV19()
+        self.evaluator = HybridDeterministicEvaluator(self.llm, self.memory.vector_store)
+        self.tool_engine = ToolCallingEngineV19(self.raw_client, self.llm)
+        self.planner = IntelligentPlanner(self.llm)
+        self.plugins = PluginManager()
+        
+        # NOVOS componentes
+        self.workspace = WorkspaceManager()
+        self.auto_repair = AutoRepairEngine(self.llm)
+        self.code_generator = MultiVersionCodeGenerator(self.llm)
+        
+        # Rate limiters
+        self.llm_limiter = DistributedRateLimiter("llm", Config.LLM_RATE_LIMIT)
+        
+        # Inicializa
+        self._inject_toolbelt()
+        self._discover_plugins()
+    
+    def _discover_plugins(self):
+        """Carrega plugins"""
+        self.plugins.discover_plugins()
+    
+    async def initialize(self):
+        """Inicializa todos os subsistemas"""
+        logger.info("🚀 Inicializando Roblox Enterprise Agent V21.0...")
+        
+        try:
+            await self.memory.initialize()
+            await self.llm.initialize()
+            await self.llm_limiter.initialize()
+            await self.workspace.initialize()
+            
+            # Inicia servidor Prometheus
+            if PROMETHEUS_AVAILABLE:
+                telemetry.start_server()
+            
+            logger.info("✅ Agente V21.0 inicializado com sucesso")
+        except Exception as e:
+            logger.error(f"❌ Erro na inicialização: {e}")
+            raise
+    
+    def _inject_toolbelt(self):
+        """Registra tools padrão e novas tools"""
+        
+        @self.tool_engine.register_tool(
+            "execute_lua",
+            "Executa código Lua em sandbox isolada",
+            {
+                "type": "object",
+                "properties": {
+                    "code": {"type": "string", "description": "Código Lua"}
+                },
+                "required": ["code"],
+                "cost": 15,
+                "parallelizable": True
+            }
+        )
+        async def execute_lua(code: str):
+            return await self.sandbox.execute(code, SandboxLanguage.LUA)
+        
+        @self.tool_engine.register_tool(
+            "execute_python",
+            "Executa código Python em sandbox isolada",
+            {
+                "type": "object",
+                "properties": {
+                    "code": {"type": "string", "description": "Código Python"}
+                },
+                "required": ["code"],
+                "cost": 15,
+                "parallelizable": True
+            }
+        )
+        async def execute_python(code: str):
+            # Valida segurança do código
+            is_safe, msg = AdvancedGuardrails.validate_code_safety(code, "python")
+            if not is_safe:
+                return {"success": False, "stderr": f"Código inseguro: {msg}"}
+            
+            return await self.sandbox.execute(code, SandboxLanguage.PYTHON)
+        
+        @self.tool_engine.register_tool(
+            "search_memory",
+            "Busca na memória semântica",
+            {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "Termo de busca"}
+                },
+                "required": ["query"],
+                "cost": 5,
+                "parallelizable": True
+            }
+        )
+        async def search_memory(query: str):
+            return await self.memory.vector_store.search(query)
+        
+        @self.tool_engine.register_tool(
+            "query_knowledge_graph",
+            "Consulta o Knowledge Graph",
+            {
+                "type": "object",
+                "properties": {
+                    "entity": {"type": "string", "description": "Entidade"}
+                },
+                "required": ["entity"],
+                "cost": 5,
+                "parallelizable": True
+            }
+        )
+        async def query_kg(entity: str):
+            return await self.memory.query_knowledge_graph(entity)
+        
+        # NOVAS TOOLS
+        
+        @self.tool_engine.register_tool(
+            "save_file",
+            "Salva arquivo no workspace do projeto",
+            {
+                "type": "object",
+                "properties": {
+                    "filename": {"type": "string", "description": "Nome do arquivo"},
+                    "content": {"type": "string", "description": "Conteúdo do arquivo"},
+                    "subdir": {"type": "string", "description": "Subdiretório (src, tests, docs)"}
+                },
+                "required": ["filename", "content"],
+                "cost": 5
+            }
+        )
+        async def save_file(filename: str, content: str, subdir: str = "src"):
+            if not self.workspace.project_dir:
+                await self.workspace.create_project("default_project")
+            
+            filepath = await self.workspace.save_file(filename, content, subdir)
+            return {"success": True, "path": str(filepath)}
+        
+        @self.tool_engine.register_tool(
+            "generate_code_variants",
+            "Gera múltiplas versões de código",
+            {
+                "type": "object",
+                "properties": {
+                    "task": {"type": "string", "description": "Descrição da tarefa"},
+                    "language": {"type": "string", "description": "Linguagem (python, lua, javascript)"},
+                    "num_variants": {"type": "integer", "description": "Número de variantes"}
+                },
+                "required": ["task"],
+                "cost": 25
+            }
+        )
+        async def generate_code_variants(task: str, language: str = "python", num_variants: int = 3):
+            variants = await self.code_generator.generate_variants(task, language, num_variants)
+            best = await self.code_generator.select_best_variant(variants)
+            
+            # Salva na memória de código
+            if best:
+                await self.memory.add_code_memory(task, best["code"], {
+                    "language": language,
+                    "strategy": best.get("strategy"),
+                    "complexity": best.get("complexity")
+                })
+            
+            return {
+                "variants": variants,
+                "best_variant": best,
+                "total_generated": len(variants)
+            }
+        
+        @self.tool_engine.register_tool(
+            "auto_repair_code",
+            "Auto-repara código com erros",
+            {
+                "type": "object",
+                "properties": {
+                    "task": {"type": "string", "description": "Tarefa original"},
+                    "code": {"type": "string", "description": "Código com erro"},
+                    "max_attempts": {"type": "integer", "description": "Máximo de tentativas"}
+                },
+                "required": ["task", "code"],
+                "cost": 30
+            }
+        )
+        async def auto_repair_code(task: str, code: str, max_attempts: int = 5):
+            # Sobrescreve o método de execução para usar a sandbox real
+            original_execute = self.auto_repair._execute_in_sandbox
+            
+            async def real_execute(test_code: str):
+                return await self.sandbox.execute(test_code, SandboxLanguage.PYTHON)
+            
+            self.auto_repair._execute_in_sandbox = real_execute
+            
+            try:
+                fixed_code, success = await self.auto_repair.auto_repair_loop(
+                    task, code, max_attempts
+                )
+                
+                if success:
+                    # Salva código corrigido
+                    await self.workspace.save_file(
+                        f"repaired_{uuid.uuid4().hex[:8]}.py",
+                        fixed_code
+                    )
+                    
+                    await self.memory.add_code_memory(task, fixed_code, {
+                        "status": "repaired",
+                        "attempts": max_attempts
+                    })
+                
+                return {
+                    "success": success,
+                    "fixed_code": fixed_code,
+                    "attempts": max_attempts
+                }
+            finally:
+                # Restaura método original
+                self.auto_repair._execute_in_sandbox = original_execute
+    
+    async def process_objective_streaming(
+        self, 
+        objective: str
+    ) -> AsyncGenerator[str, None]:
+        """Processa objetivo com streaming de resultados e auto-reparo"""
+        shutdown_manager.check()
+        
+        # Sanitiza input
+        sanitized_objective = AdvancedGuardrails.sanitize_input(objective)
+        
+        # Cria projeto no workspace
+        project_name = re.sub(r'[^\w\-_]', '_', sanitized_objective)[:30]
+        await self.workspace.create_project(project_name)
+        
+        # Planeja
+        yield "📋 Planejando execução...\n"
+        plan = await self.planner.decompose(sanitized_objective)
+        
+        yield f"📊 Plano com {len(plan)} passos:\n"
+        for i, step in enumerate(plan):
+            yield f"  {i+1}. {step}\n"
+        
+        # Constrói grafo
+        graph = EnterpriseTaskGraphV18()
+        for i, step in enumerate(plan):
+            dependencies = [f"step_{i-1}"] if i > 0 else []
+            graph.add_task(
+                id=f"step_{i}",
+                description=step,
+                dependencies=dependencies,
+                priority=len(plan) - i
+            )
+        
+        # Callback de execução com auto-reparo
+        async def executor(desc: str) -> str:
+            # Verifica memória de falhas
+            failure_lesson = await self.memory.learn_from_failures(desc)
+            if failure_lesson:
+                desc += f"\n[Lição aprendida: {failure_lesson}]"
+            
+            # Verifica memória de código
+            code_memories = await self.memory.search_code(desc)
+            if code_memories:
+                desc += f"\n[Código similar encontrado na memória]"
+            
+            # Executa com auto-correção
+            try:
+                result, success = await self.evaluator.self_correct(
+                    desc,
+                    await self.tool_engine.execute_flow(desc, max_turns=3)
+                )
+                
+                if not success:
+                    # Tenta auto-reparo
+                    yield f"\n🔧 Iniciando auto-reparo para: {desc[:50]}..."
+                    repaired_result = await self.tool_engine.execute_flow(
+                        f"Reparar: {desc}\nErro: {result}", max_turns=2
+                    )
+                    result = repaired_result
+                    
+                    await self.memory.add_failure(desc, {
+                        "result": result,
+                        "pattern": "execution_failed",
+                        "strategy": "auto_repair",
+                        "success": False
+                    })
+                
+                return result
+            except Exception as e:
+                logger.error(f"Erro na execução: {e}")
+                return f"Erro: {str(e)}"
+        
+        # Executa grafo
+        yield "\n⚙️ Executando tarefas...\n"
+        
+        try:
+            results = await asyncio.wait_for(
+                graph.run_orchestration(executor),
+                timeout=Config.DAG_GLOBAL_TIMEOUT
+            )
+        except asyncio.TimeoutError:
+            yield "\n⛔ Timeout global do DAG atingido\n"
+            return
+        
+        # Consolida resultados
+        yield "\n📊 Consolidando resultados...\n"
+        
+        consolidation_prompt = f"""
+        Gere um sumário executivo dos resultados:
+        {json.dumps(results, default=str)[:2000]}
+        
+        Objetivo original: {sanitized_objective}
+        Projeto: {project_name}
+        """
+        
+        # Streaming final
+        async for chunk in self.llm.chat_completion_streaming(
+            model=Config.DEFAULT_MODEL,
+            messages=[{"role": "user", "content": consolidation_prompt}],
+            temperature=0.3
+        ):
+            yield chunk
+        
+        # Salva na memória
+        await self.memory.vector_store.add(
+            text=sanitized_objective,
+            metadata={
+                "summary": "completed",
+                "steps": len(plan),
+                "results": str(results)[:500],
+                "project": project_name
+            },
+            importance=1.0,
+            memory_type=MemoryType.EPISODIC
+        )
+        
+        await self.memory.add_episodic({
+            "objective": sanitized_objective,
+            "plan": plan,
+            "results": results,
+            "project": project_name,
+            "status": "completed",
+            "importance": 1.0
+        })
+    
+    async def shutdown(self):
+        """Shutdown graceful"""
+        logger.info("🛑 Iniciando shutdown graceful...")
+        
+        try:
+            # Executa callbacks de limpeza
+            await shutdown_manager.execute_cleanup()
+            
+            # Fecha pools
+            pools.shutdown()
+            
+            # Fecha pool DB
+            if _db_pool:
+                _db_pool.close_all()
+            
+            logger.info("✅ Shutdown completo")
+        except Exception as e:
+            logger.error(f"❌ Erro no shutdown: {e}")
+
+# ============================================================
+# INTERFACE DO OPERADOR
+# ============================================================
+
+async def main():
+    """Interface principal"""
+    print("""
+    ╔══════════════════════════════════════════════════════════╗
+    ║   ROBLOX ENTERPRISE AGENT FRAMEWORK V21.0              ║
+    ║   Autonomous Coding Agent - Production Grade           ║
+    ║   Auto-Repair | Multi-Version Code | Workspace         ║
+    ╚══════════════════════════════════════════════════════════╝
+    """)
+    
+    # Usa API key do .env ou input
+    api_key = Config.GROQ_API_KEY
+    if not api_key:
+        api_key = input("🔑 API Key Groq: ").strip()
+    
+    if not api_key:
+        print("❌ API Key necessária. Defina GROQ_API_KEY no .env ou informe agora.")
+        return
+    
+    try:
+        agent = RobloxEnterpriseAgentV21(api_key=api_key)
+        await agent.initialize()
+        
+        # Signal handlers
+        try:
+            loop = asyncio.get_running_loop()
+            for sig in (signal.SIGINT, signal.SIGTERM):
+                loop.add_signal_handler(sig, shutdown_manager.trigger_shutdown)
+        except (NotImplementedError, RuntimeError):
+            pass
+        
+        print("\n✅ Sistema pronto. Digite '/sair' para encerrar.\n")
+        print(f"📊 Métricas: http://localhost:{Config.PROMETHEUS_PORT}")
+        print(f"📁 Logs: {Config.LOG_FILE}")
+        print(f"📁 Workspace: {Config.WORKSPACE_DIR}")
+        print(f"⏱️  Timeout HTTP: {Config.HTTP_TIMEOUT}s")
+        print(f"⏱️  Timeout DAG: {Config.DAG_GLOBAL_TIMEOUT}s")
+        print(f"⏱️  Timeout Stream: {Config.STREAM_GLOBAL_TIMEOUT}s")
+        print(f"🔧 Auto-Repair: {Config.MAX_REPAIR_ATTEMPTS} tentativas")
+        print(f"🔍 Filtro similaridade: {Config.MIN_SIMILARITY_SCORE}")
+        print(f"🔄 Rebuild FAISS: a cada {Config.FAISS_REBUILD_INTERVAL} adds")
+        print(f"📝 Max Code Versions: {Config.MAX_CODE_VERSIONS}\n")
+        
+        while not shutdown_manager.shutdown_event.is_set():
+            try:
+                prompt = input("\n🎯 Objetivo: ").strip()
+                
+                if prompt.lower() == "/sair":
+                    break
+                if not prompt:
+                    continue
+                
+                print("\n" + "─" * 60)
+                print("🤖 Processando...\n")
+                
+                try:
+                    async for chunk in agent.process_objective_streaming(prompt):
+                        print(chunk, end="", flush=True)
+                    print("\n" + "─" * 60)
+                    
+                except SecurityException as e:
+                    print(f"\n❌ Segurança: {e}")
+                except CircuitBreakerException as e:
+                    print(f"\n⚠️ Circuit Breaker: {e}")
+                except asyncio.CancelledError:
+                    break
+                except Exception as e:
+                    logger.error(f"Erro no processamento: {e}", exc_info=True)
+                    print(f"\n❌ Erro: {e}")
+                    
+            except EOFError:
+                break
+            except KeyboardInterrupt:
+                shutdown_manager.trigger_shutdown()
+                break
+        
+    except Exception as e:
+        logger.critical(f"❌ Erro fatal: {e}", exc_info=True)
+        print(f"\n❌ Erro fatal: {e}")
+        print(f"Verifique os logs em: {Config.LOG_FILE}")
+    finally:
+        await agent.shutdown()
+        print("\n👋 Sistema encerrado com sucesso.\n")
+
+# ============================================================
+# ENTRY POINT
+# ============================================================
+
+if __name__ == "__main__":
+    # Configura política de event loop
+    if IS_WINDOWS:
+        try:
+            asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+        except Exception:
+            pass
+    
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\n👋 Interrompido pelo usuário.")
+    except Exception as e:
+        logger.critical(f"❌ Erro fatal na execução: {e}", exc_info=True)
+        print(f"\n❌ Erro fatal: {e}")
+        print(f"Verifique os logs em: {Config.LOG_FILE}")

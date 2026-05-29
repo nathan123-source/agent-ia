@@ -1,22 +1,31 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: RobloxAI Agent API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: conversations
+    description: Conversation management
+  - name: messages
+    description: Message operations
+  - name: files
+    description: File uploads
+  - name: settings
+    description: User settings
+  - name: tools
+    description: Roblox AI tools
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,13 +33,684 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /conversations:
+    get:
+      operationId: listConversations
+      tags: [conversations]
+      summary: List all conversations
+      responses:
+        "200":
+          description: List of conversations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Conversation"
+    post:
+      operationId: createConversation
+      tags: [conversations]
+      summary: Create a new conversation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConversationInput"
+      responses:
+        "201":
+          description: Created conversation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Conversation"
+
+  /conversations/{id}:
+    get:
+      operationId: getConversation
+      tags: [conversations]
+      summary: Get conversation with messages
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Conversation with messages
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationWithMessages"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateConversation
+      tags: [conversations]
+      summary: Rename conversation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConversationUpdate"
+      responses:
+        "200":
+          description: Updated conversation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Conversation"
+    delete:
+      operationId: deleteConversation
+      tags: [conversations]
+      summary: Delete conversation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResult"
+
+  /conversations/{id}/messages:
+    get:
+      operationId: listMessages
+      tags: [messages]
+      summary: List messages in a conversation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Message"
+
+  /conversations/{id}/chat:
+    post:
+      operationId: sendMessage
+      tags: [messages]
+      summary: Send a message and get AI response
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MessageInput"
+      responses:
+        "200":
+          description: AI response message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+
+  /conversations/{id}/scripts:
+    get:
+      operationId: extractScripts
+      tags: [conversations]
+      summary: Extract all Lua scripts from conversation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Extracted scripts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ExtractedScript"
+
+  /conversations/stats:
+    get:
+      operationId: getConversationStats
+      tags: [conversations]
+      summary: Get overall conversation stats
+      responses:
+        "200":
+          description: Stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationStats"
+
+  /files/upload:
+    post:
+      operationId: uploadFile
+      tags: [files]
+      summary: Upload a file (max 7MB)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/FileUploadInput"
+      responses:
+        "200":
+          description: Uploaded file info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadedFile"
+
+  /settings:
+    get:
+      operationId: getSettings
+      tags: [settings]
+      summary: Get agent settings
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Settings"
+    put:
+      operationId: saveSettings
+      tags: [settings]
+      summary: Save agent settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SettingsInput"
+      responses:
+        "200":
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Settings"
+
+  /tools/analyze-script:
+    post:
+      operationId: analyzeScript
+      tags: [tools]
+      summary: Analyze a Lua script for issues
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScriptAnalysisInput"
+      responses:
+        "200":
+          description: Analysis result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScriptAnalysisResult"
+
+  /tools/remote-scanner:
+    post:
+      operationId: scanRemotes
+      tags: [tools]
+      summary: Scan script for RemoteEvents/Functions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RemoteScanInput"
+      responses:
+        "200":
+          description: Scan result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RemoteScanResult"
+
+  /tools/error-diagnostic:
+    post:
+      operationId: diagnoseError
+      tags: [tools]
+      summary: Diagnose Roblox executor error log
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ErrorDiagnosticInput"
+      responses:
+        "200":
+          description: Diagnosis result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorDiagnosticResult"
+
+  /tools/profiler:
+    post:
+      operationId: profileScript
+      tags: [tools]
+      summary: Profile script for performance issues
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProfilerInput"
+      responses:
+        "200":
+          description: Profiler result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfilerResult"
+
+  /tools/gui-builder:
+    post:
+      operationId: buildGui
+      tags: [tools]
+      summary: Generate GUI JSON config from prompt or image analysis
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GuiBuildInput"
+      responses:
+        "200":
+          description: GUI config result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GuiBuildResult"
+
 components:
   schemas:
     HealthStatus:
       type: object
+      required: [status]
       properties:
         status:
           type: string
-      required:
-        - status
 
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    DeleteResult:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+
+    Conversation:
+      type: object
+      required: [id, title, createdAt, updatedAt, messageCount]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        mode:
+          type: ["string", "null"]
+        executor:
+          type: ["string", "null"]
+        gameTarget:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+        messageCount:
+          type: integer
+
+    ConversationWithMessages:
+      type: object
+      required: [id, title, createdAt, updatedAt, messages]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        mode:
+          type: ["string", "null"]
+        executor:
+          type: ["string", "null"]
+        gameTarget:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/Message"
+
+    ConversationInput:
+      type: object
+      properties:
+        title:
+          type: string
+        mode:
+          type: string
+        executor:
+          type: string
+        gameTarget:
+          type: string
+
+    ConversationUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        mode:
+          type: string
+        executor:
+          type: string
+        gameTarget:
+          type: string
+
+    ConversationStats:
+      type: object
+      required: [totalConversations, totalMessages, totalScripts]
+      properties:
+        totalConversations:
+          type: integer
+        totalMessages:
+          type: integer
+        totalScripts:
+          type: integer
+        recentConversations:
+          type: array
+          items:
+            $ref: "#/components/schemas/Conversation"
+
+    Message:
+      type: object
+      required: [id, conversationId, role, content, createdAt]
+      properties:
+        id:
+          type: integer
+        conversationId:
+          type: integer
+        role:
+          type: string
+        content:
+          type: string
+        fileUrl:
+          type: ["string", "null"]
+        fileName:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    MessageInput:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+        fileUrl:
+          type: ["string", "null"]
+        fileName:
+          type: ["string", "null"]
+        mode:
+          type: ["string", "null"]
+
+    ExtractedScript:
+      type: object
+      required: [index, code, language]
+      properties:
+        index:
+          type: integer
+        code:
+          type: string
+        language:
+          type: string
+        messageId:
+          type: integer
+
+    FileUploadInput:
+      type: object
+      properties:
+        file:
+          type: string
+          format: binary
+
+    UploadedFile:
+      type: object
+      required: [url, name, size, type]
+      properties:
+        url:
+          type: string
+        name:
+          type: string
+        size:
+          type: integer
+        type:
+          type: string
+
+    Settings:
+      type: object
+      required: [id]
+      properties:
+        id:
+          type: integer
+        executor:
+          type: ["string", "null"]
+        platform:
+          type: ["string", "null"]
+        obfuscation:
+          type: ["string", "null"]
+        robloxVersion:
+          type: ["string", "null"]
+        scriptStyle:
+          type: ["string", "null"]
+        defaultMode:
+          type: ["string", "null"]
+        systemPromptExtra:
+          type: ["string", "null"]
+        uiLibPreference:
+          type: ["string", "null"]
+
+    SettingsInput:
+      type: object
+      properties:
+        executor:
+          type: string
+        platform:
+          type: string
+        obfuscation:
+          type: string
+        robloxVersion:
+          type: string
+        scriptStyle:
+          type: string
+        defaultMode:
+          type: string
+        systemPromptExtra:
+          type: string
+        uiLibPreference:
+          type: string
+
+    ScriptAnalysisInput:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+        conversationId:
+          type: ["integer", "null"]
+
+    ScriptAnalysisResult:
+      type: object
+      required: [issues, optimizations, score, fixedCode, explanation]
+      properties:
+        issues:
+          type: array
+          items:
+            type: string
+        optimizations:
+          type: array
+          items:
+            type: string
+        score:
+          type: integer
+        fixedCode:
+          type: string
+        explanation:
+          type: string
+
+    RemoteScanInput:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+
+    RemoteScanResult:
+      type: object
+      required: [remotes, suggestions]
+      properties:
+        remotes:
+          type: array
+          items:
+            $ref: "#/components/schemas/RemoteEntry"
+        suggestions:
+          type: array
+          items:
+            type: string
+
+    RemoteEntry:
+      type: object
+      required: [name, type, path]
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+        path:
+          type: string
+        args:
+          type: array
+          items:
+            type: string
+        bypassSuggestion:
+          type: ["string", "null"]
+
+    ErrorDiagnosticInput:
+      type: object
+      required: [errorLog]
+      properties:
+        errorLog:
+          type: string
+        originalCode:
+          type: ["string", "null"]
+
+    ErrorDiagnosticResult:
+      type: object
+      required: [rootCause, fixedCode, explanation, line]
+      properties:
+        rootCause:
+          type: string
+        fixedCode:
+          type: string
+        explanation:
+          type: string
+        line:
+          type: ["integer", "null"]
+
+    ProfilerInput:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+
+    ProfilerResult:
+      type: object
+      required: [issues, optimizedCode, fpsImpact, warnings]
+      properties:
+        issues:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProfilerIssue"
+        optimizedCode:
+          type: string
+        fpsImpact:
+          type: string
+        warnings:
+          type: array
+          items:
+            type: string
+
+    ProfilerIssue:
+      type: object
+      required: [type, description, line, severity]
+      properties:
+        type:
+          type: string
+        description:
+          type: string
+        line:
+          type: ["integer", "null"]
+        severity:
+          type: string
+
+    GuiBuildInput:
+      type: object
+      required: [prompt]
+      properties:
+        prompt:
+          type: string
+        imageBase64:
+          type: ["string", "null"]
+        style:
+          type: ["string", "null"]
+
+    GuiBuildResult:
+      type: object
+      required: [guiJson, luaCode, preview]
+      properties:
+        guiJson:
+          type: string
+        luaCode:
+          type: string
+        preview:
+          type: string
